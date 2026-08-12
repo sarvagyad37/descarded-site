@@ -1,0 +1,8 @@
+# Copy to .dev.vars for local `wrangler pages dev` testing. .dev.vars is
+# wrangler's local-secrets convention (gitignored) — Cloudflare Pages itself
+# does not read a .env file in production; real deployments use
+# `wrangler pages secret put` or the dashboard instead. See README.md →
+# "Google Sheets persistence" for both.
+
+GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/REPLACE_ME/exec
+GOOGLE_APPS_SCRIPT_SECRET=replace-with-a-long-random-value

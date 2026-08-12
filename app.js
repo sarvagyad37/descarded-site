@@ -1,31 +1,61 @@
 /* DESCARDED — shared behavior. No build step, no dependencies.
-   Talks to /api/* (Cloudflare Pages Functions in functions/api/).
-   When no backend answers (static hosting, offline), it degrades to a
-   local echo so the flow still demos — but nothing is stored. */
+   Talks to /api/* (Cloudflare Pages Functions in functions/api/), which
+   persist to Google Sheets server-side. There is no local/demo fallback —
+   if the API is unreachable or rejects the request, the UI shows a real
+   failure state. Never tell the user they're in unless persistence
+   actually confirmed it. */
 
 (function () {
   'use strict';
 
   var API_BASE = '/api';
   var EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
+  var UNREACHABLE_ERROR = "COULDN'T REACH THE SERVER. CHECK YOUR CONNECTION AND TRY AGAIN.";
 
   function isEmail(v) { return EMAIL_RE.test(String(v || '').trim()); }
 
   async function post(path, body) {
+    var res;
     try {
-      var res = await fetch(API_BASE + path, {
+      res = await fetch(API_BASE + path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (res.status === 404 || res.status === 405 || res.status === 501) return { ok: true, stub: true };
-      var data = await res.json().catch(function () { return {}; });
-      if (!res.ok) return { ok: false, error: data.error || "COULDN'T JOIN. NOTHING WAS SUBMITTED. CHECK THE EMAIL AND TRY AGAIN.", code: data.code };
-      return Object.assign({ ok: true }, data);
     } catch (e) {
-      return { ok: true, stub: true };
+      return { ok: false, error: UNREACHABLE_ERROR };
     }
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      return { ok: false, error: data.error || 'SOMETHING WENT WRONG. TRY AGAIN.', code: data.code };
+    }
+    return Object.assign({ ok: true }, data);
   }
+
+  /* ── Attribution: captured once per browser session (first touch wins),
+     read back in at submit time. Falls back to blank fields — never
+     blocks or fails a submission — if sessionStorage is unavailable
+     (e.g. private-browsing edge cases). */
+  var ATTRIBUTION_KEY = 'dscAttribution';
+
+  function readAttribution() {
+    try {
+      var raw = sessionStorage.getItem(ATTRIBUTION_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { /* sessionStorage unavailable — fall through */ }
+
+    var params = new URLSearchParams(location.search);
+    var attribution = {
+      source: params.get('utm_source') || '',
+      campaign: params.get('utm_campaign') || '',
+      referrer: document.referrer || '',
+      landing_page: location.pathname || '/'
+    };
+    try { sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(attribution)); } catch (e) { /* ignore */ }
+    return attribution;
+  }
+
+  var attribution = readAttribution();
 
   /* ── Mobile menu ── */
   var menuToggle = document.querySelector('[data-menu-toggle]');
@@ -118,7 +148,13 @@
       if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'JOINING…'; }
       if (status) { status.hidden = false; status.textContent = 'JOINING…'; }
 
-      var r = await post('/presale', { email: email, source: 'modal' });
+      var r = await post('/presale', {
+        email: email,
+        source: attribution.source,
+        campaign: attribution.campaign,
+        referrer: attribution.referrer,
+        landing_page: attribution.landing_page
+      });
 
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'JOIN'; }
       if (status) status.hidden = true;
@@ -185,13 +221,14 @@
 
       if (aSubmit) { aSubmit.disabled = false; aSubmit.textContent = 'SEND SUBMISSION'; }
 
-      if (r.ok === false) {
+      if (r.ok === false || !r.ref) {
+        // A ref is only ever fabricated server-side after persistence
+        // succeeds — if it's missing here, don't invent one client-side.
         setArtistError(r.error || 'SOMETHING WENT WRONG. TRY AGAIN.');
         return;
       }
 
-      var ref = r.ref || ('DSC-' + Math.random().toString(36).slice(2, 7).toUpperCase());
-      if (aRefEl) aRefEl.textContent = 'REF ' + ref;
+      if (aRefEl) aRefEl.textContent = 'REF ' + r.ref;
       if (aFormView) aFormView.hidden = true;
       if (aResultView) aResultView.hidden = false;
     });

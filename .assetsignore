@@ -1,0 +1,14 @@
+# Cloudflare Pages: exclude these from the deployed static asset bundle.
+# `functions/` should never be servable as a static file — it's server-side
+# source, and while it contains no secret *values* (those are env-only), it
+# does describe exactly how the auth handshake and validation work. Same
+# reasoning for the rest: none of this is meant to be publicly downloadable.
+
+functions/
+integrations/
+scripts/
+.dev.vars
+.dev.vars.example
+.gitignore
+.assetsignore
+README.md
