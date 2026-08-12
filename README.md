@@ -38,27 +38,31 @@ npx serve site
 | `.assetsignore` | Excludes `functions/`, `integrations/`, `scripts/` etc. from the deployed static asset bundle |
 | `assets/hero-still-life.jpg` | Hero photo, also used as the OG/Twitter share image |
 | `_partials/nav.html` | Single source of truth for the header + mobile menu |
-| `build.mjs` | Injects `_partials/nav.html` into every page between `<!-- NAV:START -->` / `<!-- NAV:END -->` markers |
+| `_partials/presale-modal.html` | Single source of truth for the pre-sale modal (all fields, consent, honeypot) |
+| `build.mjs` | Injects both partials into every page between their `START`/`END` markers |
 | `integrations/google-apps-script/Code.gs` | The Google Apps Script Web App source — copy this into the business Google account |
 | `scripts/mock-apps-script.mjs` | Dev/test-only stand-in for the real Apps Script, used by `wrangler pages dev` locally |
 | `scripts/test-store.mjs` | Unit tests for `_store.js`'s Google-side failure handling |
 | `scripts/test-api.sh` | Integration test matrix against a running dev server |
 
-## Editing the header / nav
+## Editing the header / nav / pre-sale modal
 
-The header and mobile menu are identical across every page except which link is
-marked `aria-current="page"`. Don't hand-edit them per file — edit
-`_partials/nav.html` once, then run:
+The header, mobile menu, and pre-sale modal are each identical across every
+page that has them (the modal's only page-to-page difference — which nav
+link is `aria-current="page"` — is handled by the nav partial, not the
+modal). Don't hand-edit any of them per file — edit `_partials/nav.html`
+and/or `_partials/presale-modal.html` once, then run:
 
 ```
 node build.mjs
 ```
 
 This rewrites `index.html`, `about.html`, `artists.html`, `conduct.html`,
-`privacy.html`, and `contact.html` in place, replacing only the content between
-their `NAV:START`/`NAV:END` markers — nothing else in those files is touched.
-`404.html` intentionally has its own simpler header (no nav, no menu) and isn't
-part of this — edit it directly if it ever needs to change.
+`privacy.html`, and `contact.html` in place, replacing only the content
+between each file's `NAV:START`/`NAV:END` and `PRESALE:START`/`PRESALE:END`
+markers — nothing else in those files is touched. `404.html` intentionally
+has its own simpler header (no nav, no menu) and no pre-sale modal at all —
+edit it directly if it ever needs to change.
 
 ## Deploy
 
@@ -84,6 +88,10 @@ from a different origin during static-only hosting).
 6. Verify `functions/`, `integrations/`, and `scripts/` are actually excluded from the
    live static bundle after your first deploy (see "A known local-only gap" below) —
    `.assetsignore` is in place but wasn't confirmed against a real deployment.
+7. Get real legal/compliance review on the SMS opt-in copy and the email-consent
+   mechanism before connecting anything to `sms_consent`/`email_consent` — see
+   "Privacy — what still needs human review" below. Neither is fake, both are
+   flagged as draft-pending-review on purpose.
 
 ## Routes
 
@@ -119,21 +127,50 @@ DESCARDED HTML → app.js → Cloudflare Pages Functions (/api/presale, /api/art
 ### 1–3. Spreadsheet, worksheets, columns
 
 Create one spreadsheet named **`DESCARDED — Form Submissions`** in the business
-Google account, with two worksheets (tabs):
+Google account, with two worksheets (tabs). Row 1 of each must be exactly
+these headers — **this is the authoritative production schema**; changing it
+requires updating `Code.gs`'s `PRESALE_HEADERS`/`ARTISTS_HEADERS` and this
+table together, not just one of them:
 
 **Presale**
 
-| created_at | email | source | campaign | referrer | landing_page |
-| --- | --- | --- | --- | --- | --- |
+| created_at | lead_id | phone | referral_code | email_consent | sms_consent | referred_by | first_name | last_name | email | status | source | campaign | medium | term | content | ip_address | user_agent | notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 **Artists**
 
-| created_at | ref | name | email | city | role | link1 | link2 | social | notes |
+| created_at | ref | artist_name | genre | email | phone | portfolio_url | social_media_url | status | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 You don't have to create these by hand — `Code.gs` creates whichever sheet is
 missing (with the correct header row) the first time it receives a real
 submission for that operation. To pre-create them instead, see step 4.
+
+`Code.gs` maps fields to columns **by header name, not position** — if you
+reorder columns in Sheets later, submissions still land in the right cell.
+If a sheet is missing an expected header entirely, `Code.gs` refuses to
+write and returns a loud, specific error (`INVALID SHEET SCHEMA on
+"Presale": missing column(s): ...`) instead of silently misaligning data.
+Run `validateSchema()` from the Apps Script editor any time to check the
+live spreadsheet against this schema without submitting anything.
+
+**Who writes what:**
+
+| Field | Where it comes from |
+| --- | --- |
+| `created_at` | `Code.gs`, at the moment the row is actually appended |
+| `lead_id` | `_store.js`, format `DSC-L-XXXXXXXX` (10 random hex chars) |
+| `referral_code` | `_store.js`, 6 random hex chars — see "Referral code" below |
+| `email_consent` | `_store.js`, always `true` on a successful submission — see "Consent" below |
+| `sms_consent` | The visitor's checkbox state, passed through unchanged |
+| `status` | `_store.js` — `active` for a new presale lead, `new` for an artist submission |
+| `phone` | The visitor's input, narrowly normalized — see "Phone handling" below |
+| `first_name` / `last_name` / `email` | The visitor's input (email required, name optional) |
+| `source` / `campaign` / `medium` / `term` / `content` / `referred_by` | `app.js` attribution capture — see "Attribution" below |
+| `ip_address` / `user_agent` | Read server-side from the request in `presale.js`/`artists.js` — see "IP address and user agent" below |
+| `notes` | Always blank on submission — it's an operational field for manual use in Sheets |
+| `ref` (Artists) | `_store.js`, format `DSC-XXXXX`, same generation approach as `lead_id` |
+| `artist_name` / `genre` / `email` / `phone` / `portfolio_url` / `social_media_url` | The visitor's input (name, email, genre, portfolio required; phone, social optional) |
 
 ### 4. Install the Apps Script
 
@@ -205,13 +242,18 @@ Apps Script or the local mock (`node scripts/mock-apps-script.mjs`):
 ```
 curl -X POST http://localhost:8788/api/presale \
   -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com","source":"utm-test"}'
+  -d '{"email":"you@example.com","first_name":"Ada","source":"instagram","campaign":"edition01"}'
 # -> {"code":"new","email":"you@example.com"}
 
 curl -X POST http://localhost:8788/api/presale \
   -H 'Content-Type: application/json' \
   -d '{"email":"you@example.com"}'
 # -> {"code":"already"} — same normalized email, no duplicate row
+
+curl -X POST http://localhost:8788/api/presale \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you2@example.com","sms_consent":true}'
+# -> 400, "ADD A PHONE NUMBER TO GET TEXT UPDATES." — sms_consent without a phone is rejected
 ```
 
 ### 9. Test `/api/artists`
@@ -219,7 +261,7 @@ curl -X POST http://localhost:8788/api/presale \
 ```
 curl -X POST http://localhost:8788/api/artists \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Test Artist","email":"a@b.com","city":"Philadelphia","role":"DJ","link1":"https://x.com"}'
+  -d '{"artist_name":"Test Artist","email":"a@b.com","genre":"hyperpop","portfolio_url":"soundcloud.com/x"}'
 # -> {"ref":"DSC-XXXXX"} — only after the row is actually written
 ```
 
@@ -254,13 +296,96 @@ which the UI says "you're in" or shows a `DSC-XXXXX` ref without a prior
 
 ### Attribution
 
-`app.js` captures `utm_source` → `source`, `utm_campaign` → `campaign`,
-`document.referrer` → `referrer`, and the landing path → `landing_page` once
-per browser session (first touch wins, stored in `sessionStorage`), so a link
-like `/?utm_source=artist_dm&utm_campaign=edition01` keeps attributing
-correctly even if the person browses to another page before opening the
-pre-sale modal. This is plain URL/session reading — no analytics library, no
-third-party tracking script.
+`app.js` maps standard UTM parameters once per browser session (first touch
+wins, stored in `sessionStorage`, so it survives navigating to another page
+before opening the pre-sale modal):
+
+| URL parameter | Sheet column |
+| --- | --- |
+| `utm_source` | `source` |
+| `utm_campaign` | `campaign` |
+| `utm_medium` | `medium` |
+| `utm_term` | `term` |
+| `utm_content` | `content` |
+| `ref` | `referred_by` |
+
+Example: `/?utm_source=instagram&utm_medium=organic-social&utm_campaign=edition01&utm_content=reel03&ref=ABC123`.
+This is plain URL/session reading — no analytics library, no third-party
+tracking script, no referral rewards or redemption logic. `referred_by` is
+stored verbatim; nothing validates it against real `referral_code` values or
+does anything with it beyond recording it for future use.
+
+### Consent
+
+**Email.** There's no separate "I agree to receive emails" checkbox. The
+pre-sale modal discloses, directly above the submit button, "WE'LL SEND
+DESCARDED EVENT UPDATES TO THIS EMAIL. UNSUBSCRIBE ANY TIME." — clicking
+JOIN immediately under that disclosure is treated as the consent mechanism,
+and `email_consent` is recorded as `true` for every successful submission.
+This preserves the pattern that already existed rather than adding a second,
+redundant checkbox for the same action the visitor just took. **This
+reasoning, not just the resulting copy, should get a compliance sanity check
+before launch** — see "Privacy" below.
+
+**SMS.** Separate, unchecked-by-default checkbox (`sms_consent`). Never
+inferred from providing a phone number — you can submit the whole form with
+a phone number and leave this unchecked, and `sms_consent` will correctly be
+`false`. Checking it without a phone number is rejected client- and
+server-side ("ADD A PHONE NUMBER TO GET TEXT UPDATES.") since consenting to
+texts with nothing to text is meaningless. **The checkbox copy in
+`_partials/presale-modal.html` is explicitly marked as draft/placeholder in
+an HTML comment and has not been legally reviewed** — see "Privacy" below.
+No SMS is ever sent; only the consent state is stored, for whatever future
+system eventually sends anything.
+
+### Referral code
+
+Every new presale lead gets a `referral_code` (6 random hex characters,
+generated in `_store.js` the same way `lead_id` is) whether or not
+`referred_by` was set. There's no uniqueness check against existing codes in
+the sheet — checking that would mean a lookup on every single write, which
+is the "materially complicates the integration" case the spec asked to stop
+and flag for. Collision odds at 6 hex characters (~16.7M possible values)
+are not a concern at the scale a single event's presale list will realistically
+reach, and nothing currently reads or redeems this code — it's stored so a
+future referral system has something to build on, not a working referral
+system itself.
+
+### Phone handling
+
+Phone is optional everywhere except when `sms_consent` is checked. Validation
+is deliberately narrow (`normalizePhone` in `functions/api/_util.js`):
+
+- 10 digits → assumed US, formatted E.164 (`+1XXXXXXXXXX`).
+- 11 digits starting with `1` → assumed US-with-country-code, formatted
+  `+XXXXXXXXXXX`.
+- Anything else with 7–15 digits → stored sanitized (digits only, plus a
+  leading `+` preserved if the visitor typed one) exactly as entered,
+  **not** reformatted or guessed at.
+- Fewer than 7 or more than 15 digits → rejected as implausible.
+
+This is intentionally not a real international phone-number library. Trying
+to guess the correct format for non-US numbers without one would produce
+confidently wrong data, which is worse than an honest un-normalized string.
+**Canonical E.164 normalization for non-US numbers is the responsibility of
+whatever marketing/SMS platform eventually consumes this column** — treat
+`phone` as "sanitized, not canonicalized" until that exists.
+
+### IP address and user agent
+
+Both are read server-side in `presale.js`/`artists.js`, never client-side,
+never returned in any API response:
+
+- `ip_address` ← the `CF-Connecting-IP` request header, which Cloudflare's
+  edge sets to the real client IP and which the client cannot forge (it's
+  added/overwritten by Cloudflare, not read from anything the browser sent).
+- `user_agent` ← the request's `User-Agent` header, truncated to 500
+  characters.
+
+Neither is used for deduplication (that's normalized email only, per
+"Expected duplicate behavior" above) or for any fingerprinting beyond
+storing the raw values — they exist for operational/security/consent-
+evidence purposes on the presale record, per the schema, and nothing more.
 
 ### Abuse controls
 
@@ -310,3 +435,28 @@ If that returns 200, treat it as a real bug and follow up — it would mean
 server-side implementation details (validation rules, the honeypot field
 name, the exact auth handshake) are publicly downloadable, which is worth
 fixing even though it wouldn't leak the secret itself.
+
+### Privacy — what still needs human review
+
+The Presale schema now includes `ip_address`, `user_agent`, and `phone` —
+personal/technical data the site wasn't collecting before this schema.
+`privacy.html` has been updated with a minimal, purely factual addition (no
+legal claims — it doesn't assert GDPR/CCPA compliance, a retention period,
+or enumerate legal rights, because none of that has been decided or
+reviewed) describing, in plain language, what's collected and that it's
+stored in a Google Sheet. **This is not a substitute for real legal review**
+before this schema goes into production with real traffic. Specifically
+flag for review:
+- Whether the current factual disclosure is sufficient or whether formal
+  privacy-policy language is required before launch.
+- The email-consent mechanism described under "Consent" above (implied via
+  disclosure + submission, not a separate checkbox) — confirm this is
+  acceptable for your jurisdiction/audience rather than requiring an
+  explicit checkbox.
+- The SMS opt-in copy in `_partials/presale-modal.html` (marked in an HTML
+  comment as draft) — needs real compliance-reviewed language, particularly
+  around consent required by SMS marketing regulations (e.g. TCPA), before
+  any SMS system is ever connected to `sms_consent: true` records.
+- Data retention / deletion — nothing in this implementation deletes or
+  expires rows; that's an operational decision for whoever manages the
+  sheet, not something this codebase enforces.

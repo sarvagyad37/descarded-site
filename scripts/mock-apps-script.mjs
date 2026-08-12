@@ -1,10 +1,16 @@
 /* Dev/test-only stand-in for the real Google Apps Script Web App.
    Emulates the same doPost contract as integrations/google-apps-script/Code.gs
-   (secret check, presale dedupe-by-email, artist append) so the Cloudflare
-   Pages Functions can be exercised end-to-end via `wrangler pages dev`
-   without needing a real Google account.
+   (secret check, header-based schema validation, presale dedupe-by-email,
+   artist append) so the Cloudflare Pages Functions can be exercised
+   end-to-end via `wrangler pages dev` without needing a real Google account.
 
    NOT used in production. Never imported by functions/api/*.
+
+   To simulate a broken production spreadsheet schema (a real, if rare,
+   failure mode Code.gs is built to fail loudly on), send an email of
+   "schema-mismatch@example.com" for presale, or an artist_name of
+   "SCHEMA_MISMATCH" for artists — the mock will respond the way Code.gs
+   would if a required column were missing, without touching its store.
 
    Usage: node scripts/mock-apps-script.mjs [port]
    Env:   MOCK_SECRET (default: test-shared-secret) */
@@ -52,6 +58,9 @@ const server = createServer(async (req, res) => {
   if (body.op === 'presale') {
     const email = String(data.email || '').trim().toLowerCase();
     if (!email || email.indexOf('@') === -1) return send(res, 200, { ok: false, error: 'INVALID EMAIL' });
+    if (email === 'schema-mismatch@example.com') {
+      return send(res, 200, { ok: false, error: 'INVALID SHEET SCHEMA on "Presale": missing column(s): lead_id' });
+    }
     if (presaleEmails.has(email)) return send(res, 200, { ok: true, code: 'already' });
     presaleEmails.set(email, { ...data, email, created_at: new Date().toISOString() });
     return send(res, 200, { ok: true, code: 'new' });
@@ -59,6 +68,9 @@ const server = createServer(async (req, res) => {
 
   if (body.op === 'artist') {
     if (!data.ref) return send(res, 200, { ok: false, error: 'MISSING REF' });
+    if (data.artist_name === 'SCHEMA_MISMATCH') {
+      return send(res, 200, { ok: false, error: 'INVALID SHEET SCHEMA on "Artists": missing column(s): genre' });
+    }
     artistSubmissions.push({ ...data, created_at: new Date().toISOString() });
     return send(res, 200, { ok: true, ref: data.ref });
   }
@@ -70,3 +82,6 @@ server.listen(PORT, () => {
   console.log(`mock apps script listening on http://127.0.0.1:${PORT}`);
   console.log(`expected secret: ${SECRET}`);
 });
+
+// Exposed for scripts/test-api.sh sanity checks / future extension.
+export { presaleEmails, artistSubmissions };

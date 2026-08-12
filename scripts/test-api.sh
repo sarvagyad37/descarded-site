@@ -34,42 +34,88 @@ RAND_EMAIL="test-$(date +%s)@example.com"
 echo "== presale =="
 
 req POST /api/presale "{\"email\":\"$RAND_EMAIL\"}"
-check "valid new email -> new" 200 '"code":"new"' "$STATUS" "$BODY"
+check "valid email-only submission -> new" 200 '"code":"new"' "$STATUS" "$BODY"
+
+req POST /api/presale "{\"email\":\"name-$(date +%s)@example.com\",\"first_name\":\"Ada\",\"last_name\":\"Lovelace\"}"
+check "valid email + name -> new" 200 '"code":"new"' "$STATUS" "$BODY"
+
+req POST /api/presale "{\"email\":\"phone-$(date +%s)@example.com\",\"phone\":\"2155551234\"}"
+check "valid email + phone -> new" 200 '"code":"new"' "$STATUS" "$BODY"
+
+req POST /api/presale "{\"email\":\"smsfalse-$(date +%s)@example.com\",\"sms_consent\":false}"
+check "sms_consent false, no phone -> new (not required)" 200 '"code":"new"' "$STATUS" "$BODY"
+
+req POST /api/presale "{\"email\":\"smstrue-$(date +%s)@example.com\",\"phone\":\"2155551234\",\"sms_consent\":true}"
+check "sms_consent true with phone -> new" 200 '"code":"new"' "$STATUS" "$BODY"
+
+req POST /api/presale "{\"email\":\"smsnophone-$(date +%s)@example.com\",\"sms_consent\":true}"
+check "sms_consent true without phone -> 400" 400 "PHONE NUMBER" "$STATUS" "$BODY"
 
 req POST /api/presale "{\"email\":\"$RAND_EMAIL\"}"
-check "duplicate email -> already" 200 '"code":"already"' "$STATUS" "$BODY"
+check "duplicate normalized email -> already" 200 '"code":"already"' "$STATUS" "$BODY"
+
+req POST /api/presale "{\"email\":\"attr-$(date +%s)@example.com\",\"source\":\"instagram\",\"campaign\":\"edition01\",\"medium\":\"organic-social\",\"term\":\"descarded\",\"content\":\"reel03\"}"
+check "attribution fields accepted -> new" 200 '"code":"new"' "$STATUS" "$BODY"
+
+req POST /api/presale "{\"email\":\"ref-$(date +%s)@example.com\",\"referred_by\":\"ABC123\"}"
+check "ref -> referred_by accepted -> new" 200 '"code":"new"' "$STATUS" "$BODY"
 
 req POST /api/presale '{"email":"not-an-email"}'
-check "invalid email -> 400" 400 "error" "$STATUS" "$BODY"
+check "malformed email -> 400" 400 "error" "$STATUS" "$BODY"
 
 req POST /api/presale '{"email":""}'
 check "empty email -> 400" 400 "error" "$STATUS" "$BODY"
 
+req POST /api/presale "{\"email\":\"badphone-$(date +%s)@example.com\",\"phone\":\"abc\"}"
+check "malformed phone -> 400" 400 "PHONE NUMBER" "$STATUS" "$BODY"
+
 req POST /api/presale "{\"email\":\"honeypot@example.com\",\"company\":\"I am a bot\"}"
 check "honeypot populated -> 400, rejected before persistence" 400 "error" "$STATUS" "$BODY"
+
+BIGVAL=$(printf 'a%.0s' $(seq 1 300))
+req POST /api/presale "{\"email\":\"oversized-$(date +%s)@example.com\",\"first_name\":\"$BIGVAL\"}"
+check "oversized payload field -> 400" 400 "error" "$STATUS" "$BODY"
 
 req POST /api/presale '{not valid json'
 check "malformed JSON -> 400" 400 "BAD REQUEST BODY" "$STATUS" "$BODY"
 
+req POST /api/presale '{"email":"schema-mismatch@example.com"}'
+check "incorrect spreadsheet schema -> 502, honest failure" 502 "error" "$STATUS" "$BODY"
+
 echo "== artists =="
 
-req POST /api/artists "{\"name\":\"Test Artist\",\"email\":\"artist-$(date +%s)@example.com\",\"city\":\"Philadelphia\",\"role\":\"DJ\",\"link1\":\"https://x.com\"}"
-check "valid submission -> ref" 200 '"ref":"DSC-' "$STATUS" "$BODY"
+req POST /api/artists "{\"artist_name\":\"Test Artist\",\"email\":\"artist-$(date +%s)@example.com\",\"genre\":\"hyperpop\",\"phone\":\"2155551234\",\"portfolio_url\":\"soundcloud.com/test\",\"social_media_url\":\"instagram.com/test\"}"
+check "valid complete submission -> ref" 200 '"ref":"DSC-' "$STATUS" "$BODY"
 
-req POST /api/artists '{"name":"Test","email":"bad","city":"Philly","role":"DJ","link1":"x"}'
+CROSS_EMAIL="cross-check-$(date +%s)@example.com"
+req POST /api/artists "{\"artist_name\":\"Cross Check\",\"email\":\"$CROSS_EMAIL\",\"genre\":\"house\",\"portfolio_url\":\"x.com\"}"
+check "artist submission with a fresh email -> ref" 200 '"ref":"DSC-' "$STATUS" "$BODY"
+req POST /api/presale "{\"email\":\"$CROSS_EMAIL\"}"
+check "same email via presale afterwards -> new, NOT already (artist never entered Presale)" 200 '"code":"new"' "$STATUS" "$BODY"
+
+req POST /api/artists "{\"artist_name\":\"\",\"email\":\"a@b.com\",\"genre\":\"house\",\"portfolio_url\":\"x.com\"}"
+check "required field (name) missing -> 400" 400 "ADD A NAME" "$STATUS" "$BODY"
+
+req POST /api/artists '{"artist_name":"Test","email":"bad","genre":"house","portfolio_url":"x.com"}'
 check "invalid email -> 400" 400 "error" "$STATUS" "$BODY"
 
-req POST /api/artists '{"name":"","email":"a@b.com","city":"Philly","role":"DJ","link1":"x"}'
-check "missing name -> 400" 400 "ADD A NAME" "$STATUS" "$BODY"
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist2-$(date +%s)@example.com\",\"genre\":\"house\",\"phone\":\"not a phone at all!!\",\"portfolio_url\":\"x.com\"}"
+check "invalid phone -> 400" 400 "PHONE NUMBER" "$STATUS" "$BODY"
 
-req POST /api/artists '{"name":"Test","email":"a@b.com","city":"Philly","role":"WIZARD","link1":"x"}'
-check "invalid role -> 400" 400 "PICK A ROLE" "$STATUS" "$BODY"
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist3-$(date +%s)@example.com\",\"genre\":\"house\",\"portfolio_url\":\"not a url\"}"
+check "invalid portfolio URL -> 400" 400 "PORTFOLIO" "$STATUS" "$BODY"
 
-req POST /api/artists '{"name":"Test","email":"a@b.com","city":"Philly","role":"DJ","link1":"x","company":"bot"}'
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist4-$(date +%s)@example.com\",\"genre\":\"house\",\"portfolio_url\":\"x.com\",\"social_media_url\":\"not a url\"}"
+check "invalid social URL -> 400" 400 "SOCIAL" "$STATUS" "$BODY"
+
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist5-$(date +%s)@example.com\",\"genre\":\"house\",\"portfolio_url\":\"x.com\",\"company\":\"bot\"}"
 check "honeypot populated -> 400, rejected before persistence" 400 "error" "$STATUS" "$BODY"
 
 req POST /api/artists '{not valid json'
 check "malformed JSON -> 400" 400 "BAD REQUEST BODY" "$STATUS" "$BODY"
+
+req POST /api/artists '{"artist_name":"SCHEMA_MISMATCH","email":"schema2@example.com","genre":"house","portfolio_url":"x.com"}'
+check "incorrect spreadsheet schema -> 502, honest failure" 502 "error" "$STATUS" "$BODY"
 
 echo "== health =="
 req GET /api/health ""

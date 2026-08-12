@@ -1,11 +1,17 @@
-/* Injects the shared header/mobile-menu (_partials/nav.html) into every page
-   between <!-- NAV:START --> and <!-- NAV:END -->. Edit the nav in ONE place
-   (_partials/nav.html), then run:
+/* Injects shared partials into every page between named markers. Edit a
+   partial once, then run:
 
      node build.mjs
 
    Zero dependencies, no bundler — this only stitches static HTML back into
-   static HTML. Pages stay plain files; nothing renders client-side. */
+   static HTML. Pages stay plain files; nothing renders client-side.
+
+   Blocks:
+     NAV      <!-- NAV:START -->      _partials/nav.html      (all 6 pages)
+     PRESALE  <!-- PRESALE:START -->  _partials/presale-modal.html  (all 6 pages)
+
+   404.html intentionally has its own simpler header and no presale modal
+   markers — it's not part of this. */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -13,8 +19,9 @@ import { dirname, join } from 'node:path';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const NAV_TEMPLATE = readFileSync(join(DIR, '_partials/nav.html'), 'utf8');
+const PRESALE_TEMPLATE = readFileSync(join(DIR, '_partials/presale-modal.html'), 'utf8');
 
-// route -> which nav link(s) get aria-current="page"
+// route -> which nav link gets aria-current="page"
 const PAGES = {
   'index.html': 'home',
   'about.html': 'about',
@@ -31,24 +38,29 @@ function renderNav(active) {
     .replaceAll('__ARTISTS_CURRENT__', active === 'artists' ? ' aria-current="page"' : '');
 }
 
-const START = '<!-- NAV:START -->';
-const END = '<!-- NAV:END -->';
+function injectBlock(html, blockName, rendered, file) {
+  const start = `<!-- ${blockName}:START -->`;
+  const end = `<!-- ${blockName}:END -->`;
+  const startIdx = html.indexOf(start);
+  const endIdx = html.indexOf(end);
+  if (startIdx === -1 || endIdx === -1) {
+    console.warn(`skip ${file}: ${blockName} markers not found`);
+    return html;
+  }
+  const before = html.slice(0, startIdx + start.length);
+  const after = html.slice(endIdx);
+  return `${before}\n${rendered}${after}`;
+}
 
 let changed = 0;
 for (const [file, active] of Object.entries(PAGES)) {
   const path = join(DIR, file);
-  const html = readFileSync(path, 'utf8');
-  const startIdx = html.indexOf(START);
-  const endIdx = html.indexOf(END);
-  if (startIdx === -1 || endIdx === -1) {
-    console.warn(`skip ${file}: NAV markers not found`);
-    continue;
-  }
-  const before = html.slice(0, startIdx + START.length);
-  const after = html.slice(endIdx);
-  const nav = renderNav(active);
-  const next = `${before}\n${nav}${after}`;
-  if (next !== html) {
+  const original = readFileSync(path, 'utf8');
+
+  let next = injectBlock(original, 'NAV', renderNav(active), file);
+  next = injectBlock(next, 'PRESALE', PRESALE_TEMPLATE, file);
+
+  if (next !== original) {
     writeFileSync(path, next);
     console.log(`updated ${file}`);
     changed++;

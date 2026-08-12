@@ -122,35 +122,70 @@
   </div>
 </footer>
 
+<!-- PRESALE:START -->
 <div class="presale-backdrop" data-presale-backdrop hidden></div>
+
 <div class="presale-panel" data-presale-panel role="dialog" aria-modal="true" aria-label="Pre-sale access" hidden>
   <div data-presale-form-view>
     <div class="presale-head">
       <h2>PRE-SALE ACCESS</h2>
       <button type="button" class="presale-close" data-close-presale aria-label="Close">&times;</button>
     </div>
+
     <p class="presale-payoff">GET THE VENUE + FIRST TICKET RELEASE.</p>
+
     <form data-presale-form novalidate>
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label" for="presale-first-name">FIRST NAME</label>
+          <input class="field-input" type="text" id="presale-first-name" name="first_name" autocomplete="given-name">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="presale-last-name">LAST NAME</label>
+          <input class="field-input" type="text" id="presale-last-name" name="last_name" autocomplete="family-name">
+        </div>
+      </div>
+
       <div class="field-group">
         <label class="field-label" for="presale-email">EMAIL</label>
         <input class="field-input" type="email" id="presale-email" name="email" autocomplete="email" required data-presale-email aria-describedby="presale-email-error">
       </div>
+
+      <div class="field-group">
+        <label class="field-label" for="presale-phone">PHONE (OPTIONAL)</label>
+        <input class="field-input" type="tel" id="presale-phone" name="phone" autocomplete="tel" data-presale-phone>
+      </div>
+
       <p class="field-error" id="presale-email-error" data-presale-field-error role="alert" hidden></p>
+
+      <!-- SMS opt-in copy below is DRAFT/PLACEHOLDER, not yet legally
+           reviewed — flagged in README under "still needs review" before
+           production. Checkbox is unchecked by default; submitting the
+           form without checking it is fully supported. -->
+      <label class="field-checkbox">
+        <input type="checkbox" id="presale-sms-consent" name="sms_consent" data-presale-sms-consent>
+        <span>ALSO TEXT ME UPDATES. MSG &amp; DATA RATES MAY APPLY. REPLY STOP TO OPT OUT.</span>
+      </label>
+
       <div class="sr-only" aria-hidden="true">
         <label for="presale-company">Leave this field blank</label>
         <input type="text" id="presale-company" name="company" tabindex="-1" autocomplete="off" data-presale-honeypot>
       </div>
+
       <button type="submit" class="presale-submit" data-presale-submit>JOIN</button>
       <p class="presale-status" data-presale-status role="status" aria-live="polite" hidden></p>
     </form>
+
     <p class="presale-privacy">WE'LL SEND DESCARDED EVENT UPDATES TO THIS EMAIL. UNSUBSCRIBE ANY TIME.</p>
   </div>
+
   <div class="presale-result" data-presale-result-view role="status" aria-live="polite" hidden>
     <h2 data-presale-result-headline></h2>
     <p data-presale-result-body></p>
     <button type="button" class="presale-result-done" data-close-presale>DONE</button>
   </div>
 </div>
+<!-- PRESALE:END -->
 
 <script src="/app.js"></script>
 </body>

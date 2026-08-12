@@ -227,6 +227,8 @@ main { display: block; }
   font: 400 16px/1.6 'Chivo', sans-serif; letter-spacing: 0.05em; color: rgba(255,255,255,0.75);
   margin-bottom: 20px;
 }
+.field-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.field-row .field-group { flex: 1 1 160px; }
 .field-group { display: flex; flex-direction: column; gap: 8px; }
 .field-label {
   font: 600 10px/1 'Chivo', sans-serif; letter-spacing: 0.24em; color: rgba(255,255,255,0.55);
@@ -241,6 +243,14 @@ main { display: block; }
 .field-input:focus, .field-select:focus, .field-textarea:focus { border-color: var(--yellow); outline: none; }
 .field-error {
   font: 600 10px/1.5 'Chivo', sans-serif; letter-spacing: 0.1em; color: var(--pink); margin-top: 8px;
+}
+.field-checkbox {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  font: 400 13px/1.5 'Chivo', sans-serif; letter-spacing: 0.03em; color: rgba(255,255,255,0.68);
+}
+.field-checkbox input[type="checkbox"] {
+  flex: none; width: 18px; height: 18px; margin-top: 1px;
+  accent-color: var(--pink); cursor: pointer;
 }
 .presale-submit { width: 100%; margin-top: 16px; padding: 17px 0 16px; font-size: clamp(16px, 2.6vw, 22px); }
 .presale-submit:disabled { opacity: 0.6; cursor: default; }

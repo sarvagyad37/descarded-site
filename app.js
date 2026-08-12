@@ -14,6 +14,9 @@
 
   function isEmail(v) { return EMAIL_RE.test(String(v || '').trim()); }
 
+  var URL_RE = /^\S+\.\S{2,}$/; // loose: no whitespace, has a dot with 2+ chars after — matches server-side check
+  function looksLikeUrl(v) { return URL_RE.test(String(v || '').trim()); }
+
   async function post(path, body) {
     var res;
     try {
@@ -35,7 +38,9 @@
   /* ── Attribution: captured once per browser session (first touch wins),
      read back in at submit time. Falls back to blank fields — never
      blocks or fails a submission — if sessionStorage is unavailable
-     (e.g. private-browsing edge cases). */
+     (e.g. private-browsing edge cases). Only fields with a column in the
+     Presale sheet are captured — no document.referrer/landing_page here,
+     the schema doesn't have a place for them. */
   var ATTRIBUTION_KEY = 'dscAttribution';
 
   function readAttribution() {
@@ -48,8 +53,10 @@
     var attribution = {
       source: params.get('utm_source') || '',
       campaign: params.get('utm_campaign') || '',
-      referrer: document.referrer || '',
-      landing_page: location.pathname || '/'
+      medium: params.get('utm_medium') || '',
+      term: params.get('utm_term') || '',
+      content: params.get('utm_content') || '',
+      referred_by: params.get('ref') || ''
     };
     try { sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(attribution)); } catch (e) { /* ignore */ }
     return attribution;
@@ -83,6 +90,8 @@
   var resultView = document.querySelector('[data-presale-result-view]');
   var form = document.querySelector('[data-presale-form]');
   var emailInput = document.querySelector('[data-presale-email]');
+  var phoneInput = document.querySelector('[data-presale-phone]');
+  var smsConsentInput = document.querySelector('[data-presale-sms-consent]');
   var honeypot = document.querySelector('[data-presale-honeypot]');
   var submitBtn = document.querySelector('[data-presale-submit]');
   var status = document.querySelector('[data-presale-status]');
@@ -98,7 +107,8 @@
     setMenu(false);
     if (formView) formView.hidden = false;
     if (resultView) resultView.hidden = true;
-    if (emailInput) { emailInput.value = ''; emailInput.focus(); }
+    if (form) form.reset();
+    if (emailInput) emailInput.focus();
     clearFieldError();
   }
 
@@ -144,16 +154,29 @@
         showFieldError("THAT EMAIL DOESN'T LOOK RIGHT. CHECK IT AND TRY AGAIN.");
         return;
       }
+      var phone = (phoneInput && phoneInput.value || '').trim();
+      var smsConsent = !!(smsConsentInput && smsConsentInput.checked);
+      if (smsConsent && !phone) {
+        showFieldError('ADD A PHONE NUMBER TO GET TEXT UPDATES.');
+        return;
+      }
       clearFieldError();
       if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'JOINING…'; }
       if (status) { status.hidden = false; status.textContent = 'JOINING…'; }
 
+      var formData = new FormData(form);
       var r = await post('/presale', {
         email: email,
+        first_name: String(formData.get('first_name') || '').trim(),
+        last_name: String(formData.get('last_name') || '').trim(),
+        phone: phone,
+        sms_consent: smsConsent,
         source: attribution.source,
         campaign: attribution.campaign,
-        referrer: attribution.referrer,
-        landing_page: attribution.landing_page
+        medium: attribution.medium,
+        term: attribution.term,
+        content: attribution.content,
+        referred_by: attribution.referred_by
       });
 
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'JOIN'; }
@@ -199,25 +222,30 @@
       if (aHoneypot && aHoneypot.value) return;
 
       var data = new FormData(artistForm);
-      var name = String(data.get('name') || '').trim();
+      var artistName = String(data.get('artist_name') || '').trim();
       var email = String(data.get('email') || '').trim();
-      var city = String(data.get('city') || '').trim();
-      var role = String(data.get('role') || '').trim();
-      var link1 = String(data.get('link1') || '').trim();
-      var link2 = String(data.get('link2') || '').trim();
-      var notes = String(data.get('notes') || '').trim();
-      var social = String(data.get('social') || '').trim();
+      var genre = String(data.get('genre') || '').trim();
+      var phone = String(data.get('phone') || '').trim();
+      var portfolioUrl = String(data.get('portfolio_url') || '').trim();
+      var socialMediaUrl = String(data.get('social_media_url') || '').trim();
 
-      if (!name) return setArtistError('ADD A NAME OR ALIAS.');
+      if (!artistName) return setArtistError('ADD A NAME OR ALIAS.');
       if (!isEmail(email)) return setArtistError("THAT EMAIL DOESN'T LOOK RIGHT.");
-      if (!city) return setArtistError('ADD A CITY.');
-      if (!role) return setArtistError('PICK A ROLE.');
-      if (!link1) return setArtistError('ADD A PRIMARY WORK LINK.');
+      if (!genre) return setArtistError('ADD A GENRE.');
+      if (!looksLikeUrl(portfolioUrl)) return setArtistError('ADD A VALID PORTFOLIO LINK.');
+      if (socialMediaUrl && !looksLikeUrl(socialMediaUrl)) return setArtistError("THAT SOCIAL LINK DOESN'T LOOK RIGHT.");
 
       setArtistError(null);
       if (aSubmit) { aSubmit.disabled = true; aSubmit.textContent = 'SENDING…'; }
 
-      var r = await post('/artists', { name: name, email: email, city: city, role: role, link1: link1, link2: link2, notes: notes, social: social });
+      var r = await post('/artists', {
+        artist_name: artistName,
+        email: email,
+        genre: genre,
+        phone: phone,
+        portfolio_url: portfolioUrl,
+        social_media_url: socialMediaUrl
+      });
 
       if (aSubmit) { aSubmit.disabled = false; aSubmit.textContent = 'SEND SUBMISSION'; }
 

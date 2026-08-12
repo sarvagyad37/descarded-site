@@ -21,13 +21,32 @@
  *   4. Optional: run setupSheets() once from the editor to pre-create both
  *      worksheets with headers. Otherwise they're created lazily on first
  *      real submission.
+ *
+ * Schema note: row 1 of each sheet is the source of truth for where each
+ * field gets written — this script maps by HEADER NAME, not column
+ * position, and refuses to write (returns ok:false) if a sheet exists but
+ * is missing an expected header. That way a human reordering columns in
+ * Sheets doesn't silently misalign data, and a genuinely broken schema
+ * fails loudly instead of writing garbage into the wrong cells.
  */
 
 var PRESALE_SHEET = 'Presale';
 var ARTISTS_SHEET = 'Artists';
 
-var PRESALE_HEADERS = ['created_at', 'email', 'source', 'campaign', 'referrer', 'landing_page'];
-var ARTISTS_HEADERS = ['created_at', 'ref', 'name', 'email', 'city', 'role', 'link1', 'link2', 'social', 'notes'];
+// Canonical order — used only when a sheet is created fresh by this script.
+// For existing sheets, actual header positions (any order) are respected;
+// see mapRowFromHeaders().
+var PRESALE_HEADERS = [
+  'created_at', 'lead_id', 'phone', 'referral_code', 'email_consent',
+  'sms_consent', 'referred_by', 'first_name', 'last_name', 'email',
+  'status', 'source', 'campaign', 'medium', 'term', 'content',
+  'ip_address', 'user_agent', 'notes'
+];
+
+var ARTISTS_HEADERS = [
+  'created_at', 'ref', 'artist_name', 'genre', 'email', 'phone',
+  'portfolio_url', 'social_media_url', 'status', 'notes'
+];
 
 function doPost(e) {
   var result;
@@ -85,20 +104,17 @@ function handlePresale(data) {
     return { ok: false, error: 'SERVER BUSY, TRY AGAIN' };
   }
   try {
-    var sheet = getOrCreateSheet(PRESALE_SHEET, PRESALE_HEADERS);
-    var existingRow = findRowByColumnValue(sheet, 2, email); // column B = email
+    var sheetInfo = getValidatedSheet(PRESALE_SHEET, PRESALE_HEADERS);
+    if (!sheetInfo.ok) return sheetInfo;
+
+    var emailCol = sheetInfo.headerMap.email;
+    var existingRow = findRowByColumnValue(sheetInfo.sheet, emailCol, email);
     if (existingRow) {
       return { ok: true, code: 'already' };
     }
 
-    sheet.appendRow([
-      new Date().toISOString(),
-      email,
-      truncate(data.source, 200),
-      truncate(data.campaign, 200),
-      truncate(data.referrer, 500),
-      truncate(data.landing_page, 200)
-    ]);
+    var row = mapRowFromHeaders(sheetInfo.headers, Object.assign({}, data, { email: email }));
+    sheetInfo.sheet.appendRow(row);
     return { ok: true, code: 'new' };
   } finally {
     lock.releaseLock();
@@ -117,23 +133,68 @@ function handleArtist(data) {
     return { ok: false, error: 'SERVER BUSY, TRY AGAIN' };
   }
   try {
-    var sheet = getOrCreateSheet(ARTISTS_SHEET, ARTISTS_HEADERS);
-    sheet.appendRow([
-      new Date().toISOString(),
-      ref,
-      truncate(data.name, 200),
-      email,
-      truncate(data.city, 200),
-      truncate(data.role, 100),
-      truncate(data.link1, 500),
-      truncate(data.link2, 500),
-      truncate(data.social, 200),
-      truncate(data.notes, 4000)
-    ]);
+    var sheetInfo = getValidatedSheet(ARTISTS_SHEET, ARTISTS_HEADERS);
+    if (!sheetInfo.ok) return sheetInfo;
+
+    var row = mapRowFromHeaders(sheetInfo.headers, Object.assign({}, data, { email: email, ref: ref }));
+    sheetInfo.sheet.appendRow(row);
     return { ok: true, ref: ref };
   } finally {
     lock.releaseLock();
   }
+}
+
+/** Opens (or creates) a sheet and validates its row-1 headers contain every
+ *  entry in expectedHeaders (order-independent). Returns either
+ *  { ok: true, sheet, headers, headerMap } or { ok: false, error }. Never
+ *  writes when validation fails. */
+function getValidatedSheet(name, expectedHeaders) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(name);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(expectedHeaders);
+  }
+
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) {
+    return String(h || '').trim();
+  });
+
+  if (headers.length === 1 && headers[0] === '') {
+    // Sheet exists but is completely empty — treat like a fresh sheet.
+    sheet.appendRow(expectedHeaders);
+    headers = expectedHeaders.slice();
+  }
+
+  var headerMap = {};
+  headers.forEach(function (h, i) { if (h) headerMap[h] = i + 1; }); // 1-based column
+
+  var missing = expectedHeaders.filter(function (h) { return !(h in headerMap); });
+  if (missing.length) {
+    return {
+      ok: false,
+      error: 'INVALID SHEET SCHEMA on "' + name + '": missing column(s): ' + missing.join(', ')
+    };
+  }
+
+  return { ok: true, sheet: sheet, headers: headers, headerMap: headerMap };
+}
+
+/** Builds a row array matching the sheet's ACTUAL header order (whatever it
+ *  currently is), pulling each value from data[headerName]. "created_at" is
+ *  always stamped fresh here, regardless of what's in data, since it must
+ *  reflect actual persistence time. Unknown/extra sheet columns (headers
+ *  not in our schema) are left blank rather than guessed at. */
+function mapRowFromHeaders(headers, data) {
+  var now = new Date().toISOString();
+  return headers.map(function (header) {
+    if (header === 'created_at') return now;
+    if (!(header in data)) return '';
+    var v = data[header];
+    return v === null || v === undefined ? '' : v;
+  });
 }
 
 function normalizeEmail(v) {
@@ -142,23 +203,6 @@ function normalizeEmail(v) {
 
 function isPlausibleEmail(v) {
   return typeof v === 'string' && v.indexOf('@') > 0 && v.indexOf('.', v.indexOf('@')) > -1 && v.length <= 254;
-}
-
-function truncate(v, max) {
-  var s = String(v == null ? '' : v);
-  return s.length > max ? s.slice(0, max) : s;
-}
-
-function getOrCreateSheet(name, headers) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(name);
-  if (!sheet) {
-    sheet = ss.insertSheet(name);
-  }
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(headers);
-  }
-  return sheet;
 }
 
 function findRowByColumnValue(sheet, columnIndex, normalizedValue) {
@@ -174,8 +218,19 @@ function findRowByColumnValue(sheet, columnIndex, normalizedValue) {
 }
 
 /** Run once manually from the Apps Script editor (Run → setupSheets) to
- *  pre-create both worksheets with the correct headers. Safe to re-run. */
+ *  pre-create both worksheets with the correct headers. Safe to re-run —
+ *  it won't touch a sheet that already has data. */
 function setupSheets() {
-  getOrCreateSheet(PRESALE_SHEET, PRESALE_HEADERS);
-  getOrCreateSheet(ARTISTS_SHEET, ARTISTS_HEADERS);
+  getValidatedSheet(PRESALE_SHEET, PRESALE_HEADERS);
+  getValidatedSheet(ARTISTS_SHEET, ARTISTS_HEADERS);
+}
+
+/** Run manually from the editor to sanity-check the live spreadsheet
+ *  against the schema this script expects, without submitting any data.
+ *  Logs results to the Apps Script execution log (View → Logs). */
+function validateSchema() {
+  var presale = getValidatedSheet(PRESALE_SHEET, PRESALE_HEADERS);
+  var artists = getValidatedSheet(ARTISTS_SHEET, ARTISTS_HEADERS);
+  Logger.log('Presale: ' + (presale.ok ? 'OK' : presale.error));
+  Logger.log('Artists: ' + (artists.ok ? 'OK' : artists.error));
 }
