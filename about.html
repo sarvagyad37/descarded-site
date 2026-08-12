@@ -24,6 +24,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@800&family=Chivo:ital,wght@0,400;0,500;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 <style>
+  /* Deliberately a single editorial column, not the two-column rail+body
+     split used on Artists — that's the main compositional differentiator
+     between the two pages (see repo README/commit notes). */
   .about-hero {
     position: relative; min-height: calc(100vh - 44px);
     display: flex; align-items: center; overflow: hidden;
@@ -31,23 +34,59 @@
   .about-hero-bg {
     position: absolute; inset: 0;
     background-image: url("/assets/hero-still-life.jpg");
-    background-size: cover; background-position: 78% 44%;
+    background-size: cover; background-position: 85% 38%;
   }
-  .about-hero-scrim { position: absolute; inset: 0; background: rgba(7,7,7,.9); }
+  .about-hero-scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(115deg, #070707 0%, rgba(7,7,7,.95) 32%, rgba(7,7,7,.82) 58%, rgba(7,7,7,.7) 100%);
+  }
   .about-hero-content {
-    position: relative; width: 100%; max-width: 1440px; margin: 0 auto;
+    position: relative; width: 100%; max-width: 860px; margin: 0 auto;
     padding: 150px clamp(20px,4vw,46px) 68px;
-    display: flex; gap: clamp(26px,4.2vw,60px); flex-wrap: wrap; align-items: flex-start;
   }
-  .about-rail { flex: 0 0 260px; display: flex; flex-direction: column; gap: 16px; }
-  .about-rail-rule { height: 1px; background: rgba(255,255,255,.3); }
-  .about-rail-facts { font: 600 10px/1.9 'Chivo', sans-serif; letter-spacing: .22em; color: var(--muted); }
-  .about-rail-facts .accent-yellow { color: var(--yellow); }
-  .about-main { flex: 1 1 520px; min-width: 0; }
-  .about-h1 { font: 800 clamp(20px,4.6vw,42px)/1 'Unbounded', sans-serif; letter-spacing: -.02em; }
+
+  .about-eyebrow {
+    font: 600 10px/1 'Chivo', sans-serif; letter-spacing: .22em; color: var(--muted);
+  }
+  .about-eyebrow .accent-yellow { color: var(--yellow); }
+  .about-eyebrow-rule { width: 140px; height: 1px; background: rgba(255,255,255,.3); margin-top: 16px; }
+
+  .about-h1 {
+    margin-top: 22px;
+    font: 800 clamp(28px,6vw,52px)/1.02 'Unbounded', sans-serif; letter-spacing: -.02em;
+  }
   .about-h1 .accent { color: var(--pink); }
-  .about-body { margin-top: 26px; display: flex; flex-direction: column; gap: 16px; font: 400 16px/1.7 'Chivo', sans-serif; letter-spacing: .05em; color: rgba(255,255,255,.88); max-width: 62ch; }
-  .about-cta { margin-top: 26px; display: inline-block; font-size: clamp(16px,2.6vw,26px); padding: 18px 32px 17px; }
+
+  .about-thesis {
+    margin-top: 24px;
+    font: 700 clamp(19px,3.2vw,28px)/1.3 'Chivo', sans-serif; letter-spacing: -.005em;
+    color: #fff; max-width: 19ch;
+  }
+
+  .about-copy {
+    margin-top: 20px;
+    font: 400 16px/1.7 'Chivo', sans-serif; letter-spacing: .05em; color: rgba(255,255,255,.78);
+    max-width: 54ch;
+  }
+
+  .about-elements {
+    margin-top: 22px; display: flex; flex-wrap: wrap; gap: 6px 20px;
+    font: 700 15px/1.5 'Chivo', sans-serif; letter-spacing: .04em; color: rgba(255,255,255,.92);
+  }
+
+  /* The manifesto payoff is the page's one major visual moment — matched
+     in scale to the H1 elsewhere on the site, not styled as body copy. */
+  .about-manifesto { margin-top: 38px; }
+  .about-manifesto-eyebrow {
+    font: 600 10px/1.7 'Chivo', sans-serif; letter-spacing: .22em; color: var(--muted);
+  }
+  .about-manifesto-payoff {
+    margin-top: 8px;
+    font: 800 clamp(28px,6.4vw,54px)/1.05 'Unbounded', sans-serif; letter-spacing: -.02em; color: #fff;
+  }
+  .about-manifesto-payoff .accent { color: var(--pink); }
+
+  .about-cta { margin-top: 32px; display: inline-block; font-size: clamp(16px,2.6vw,26px); padding: 18px 32px 17px; }
 </style>
 </head>
 <body>
@@ -117,21 +156,28 @@
     <div class="about-hero-bg"></div>
     <div class="about-hero-scrim"></div>
     <div class="about-hero-content">
-      <div class="about-rail">
-        <div class="about-rail-rule"></div>
-        <div class="about-rail-facts">EDITION 01<br><span class="accent-yellow">PHILADELPHIA</span><br>SEPT 24–26, 2026</div>
-        <div class="about-rail-rule"></div>
+      <div class="about-eyebrow">EDITION 01 — <span class="accent-yellow">PHILADELPHIA</span> — SEPT 24–26, 2026</div>
+      <div class="about-eyebrow-rule"></div>
+
+      <h1 class="about-h1">ABOUT<br>DESCARDED<span class="accent">.</span></h1>
+
+      <p class="about-thesis">THE INTERNET CHANGED CULTURE. IT DIDN'T REPLACE BEING THERE.</p>
+
+      <p class="about-copy">DESCARDED TAKES THE MUSIC, ART, GAMES, CHARACTERS, SCENES AND OBSESSIONS PEOPLE FIND THROUGH SCREENS — AND GIVES THE RIGHT ONES A PHYSICAL FORM.</p>
+
+      <div class="about-elements">
+        <span>A ROOM.</span>
+        <span>A SOUND.</span>
+        <span>A LOOK.</span>
+        <span>A REASON TO SHOW UP.</span>
       </div>
-      <div class="about-main">
-        <h1 class="about-h1">ABOUT<br>DESCARDED<span class="accent">.</span></h1>
-        <div class="about-body">
-          <p>THE INTERNET CHANGED WHAT PEOPLE CARE ABOUT. IT DIDN'T REPLACE BEING IN A ROOM TOGETHER.</p>
-          <p>DESCARDED MAKES PHYSICAL EVENTS AROUND CULTURE THAT PEOPLE USUALLY MEET THROUGH A SCREEN — MUSIC, ART, GAMES, CHARACTERS, SCENES, OBSESSIONS AND THE WORLDS AROUND THEM.</p>
-          <p>THE POINT ISN'T TO RECREATE THE INTERNET IN A VENUE. IT'S TO GIVE THE RIGHT IDEA A PHYSICAL FORM: A ROOM, A SOUND, A LOOK AND A REASON TO SHOW UP.</p>
-          <p>EACH EDITION CAN CHANGE. THE STANDARD DOESN'T: THE IDEA HAS TO DESERVE THE ROOM.</p>
-        </div>
-        <button type="button" class="nav-cta about-cta" data-open-presale>JOIN PRE-SALE&nbsp; →</button>
+
+      <div class="about-manifesto">
+        <p class="about-manifesto-eyebrow">EACH EDITION CHANGES.<br>THE STANDARD DOESN'T:</p>
+        <p class="about-manifesto-payoff">THE IDEA HAS TO<br>DESERVE THE ROOM<span class="accent">.</span></p>
       </div>
+
+      <button type="button" class="nav-cta about-cta" data-open-presale>JOIN PRE-SALE&nbsp; →</button>
     </div>
   </section>
 </main>

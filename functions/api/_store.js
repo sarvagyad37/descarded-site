@@ -98,12 +98,17 @@ export async function addSubscriber(env, entry) {
   return { code: payload.code === 'already' ? 'already' : 'new' };
 }
 
-/* entry keys match the Artists sheet's header names 1:1, same reasoning. */
+/* entry keys match the Artists sheet's header names 1:1, same reasoning.
+   creator_type is the controlled-vocabulary triage field (DJ / MUSIC,
+   PERFORMANCE, etc — see functions/api/artists.js for the list); genre is
+   a separate, optional, free-text style field and is never used as a
+   substitute for it. */
 export async function addSubmission(env, entry) {
   const ref = generateArtistRef();
   await callAppsScript(env, 'artist', {
     ref,
     artist_name: entry.artistName || '',
+    creator_type: entry.creatorType || '',
     genre: entry.genre || '',
     email: String(entry.email || '').trim().toLowerCase(),
     phone: entry.phone || '',

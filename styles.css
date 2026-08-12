@@ -239,7 +239,17 @@ main { display: block; }
   width: 100%;
 }
 .field-textarea { font-family: inherit; resize: vertical; padding-top: 12px; }
-.field-select { appearance: none; }
+.field-select {
+  appearance: none;
+  /* appearance:none drops the native dropdown arrow — replace it so a
+     <select> doesn't read as a plain text input. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23ffffff' stroke-opacity='.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 8 10 13 15 8'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  padding-right: 42px;
+}
+.field-select:invalid { color: rgba(255, 255, 255, 0.45); }
 .field-input:focus, .field-select:focus, .field-textarea:focus { border-color: var(--yellow); outline: none; }
 .field-error {
   font: 600 10px/1.5 'Chivo', sans-serif; letter-spacing: 0.1em; color: var(--pink); margin-top: 8px;

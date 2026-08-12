@@ -142,7 +142,7 @@
         <h1 class="artists-h1">ARTISTS<span class="accent">.</span></h1>
         <div class="artists-body">
           <p>IF YOUR WORK COULD CHANGE THE ROOM, SEND IT.</p>
-          <p>DJS, PERFORMERS, VISUAL ARTISTS + OTHER CREATORS CAN SEND WORK FOR FUTURE DESCARDED EDITIONS.</p>
+          <p>MUSIC. PERFORMANCE. VISUALS. INSTALLATION. DIGITAL WORK. AND THINGS THAT DON'T FIT CLEANLY INTO A CATEGORY.</p>
         </div>
         <div class="artists-note">SUBMITTING WORK IS NOT A BOOKING OR A PROMISE OF A REPLY. IF THERE'S A FIT, DESCARDED CAN FOLLOW UP.</div>
       </div>
@@ -163,8 +163,18 @@
 
             <div class="field-row">
               <div class="field-group">
-                <label class="field-label" for="a-genre">GENRE</label>
-                <input class="field-input" id="a-genre" name="genre" type="text" placeholder="HYPERPOP, HOUSE, NO WAVE…" required>
+                <label class="field-label" for="a-creator-type">CREATOR TYPE</label>
+                <select class="field-select" id="a-creator-type" name="creator_type" required>
+                  <option value="">SELECT ONE</option>
+                  <option value="DJ / MUSIC">DJ / MUSIC</option>
+                  <option value="PERFORMANCE">PERFORMANCE</option>
+                  <option value="VISUAL ART">VISUAL ART</option>
+                  <option value="PHOTO / VIDEO">PHOTO / VIDEO</option>
+                  <option value="DESIGN / FASHION">DESIGN / FASHION</option>
+                  <option value="INSTALLATION">INSTALLATION</option>
+                  <option value="DIGITAL / INTERACTIVE">DIGITAL / INTERACTIVE</option>
+                  <option value="OTHER">OTHER</option>
+                </select>
               </div>
               <div class="field-group">
                 <label class="field-label" for="a-phone">PHONE (OPTIONAL)</label>
@@ -173,12 +183,17 @@
             </div>
 
             <div class="field-group">
-              <label class="field-label" for="a-portfolio">PORTFOLIO LINK</label>
-              <input class="field-input" id="a-portfolio" name="portfolio_url" type="text" placeholder="SOUNDCLOUD / PORTFOLIO / REEL" required>
+              <label class="field-label" for="a-genre">STYLE / GENRE (OPTIONAL)</label>
+              <input class="field-input" id="a-genre" name="genre" type="text" placeholder="HOUSE, INSTALLATION, GLITCH, MIXED MEDIA…">
             </div>
 
             <div class="field-group">
-              <label class="field-label" for="a-social">SOCIAL MEDIA LINK (OPTIONAL)</label>
+              <label class="field-label" for="a-portfolio">WORK LINK</label>
+              <input class="field-input" id="a-portfolio" name="portfolio_url" type="text" placeholder="SOUNDCLOUD / YOUTUBE / WEBSITE / REEL" required>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="a-social">SOCIAL MEDIA (OPTIONAL)</label>
               <input class="field-input" id="a-social" name="social_media_url" type="text">
             </div>
 
@@ -189,7 +204,7 @@
 
             <p class="field-error" data-artist-error role="alert" hidden></p>
 
-            <button type="submit" class="send-submission artist-submit" data-artist-submit>SEND SUBMISSION</button>
+            <button type="submit" class="send-submission artist-submit" data-artist-submit>SEND WORK&nbsp; →</button>
           </form>
         </div>
 

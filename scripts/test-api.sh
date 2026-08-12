@@ -84,37 +84,49 @@ check "incorrect spreadsheet schema -> 502, honest failure" 502 "error" "$STATUS
 
 echo "== artists =="
 
-req POST /api/artists "{\"artist_name\":\"Test Artist\",\"email\":\"artist-$(date +%s)@example.com\",\"genre\":\"hyperpop\",\"phone\":\"2155551234\",\"portfolio_url\":\"soundcloud.com/test\",\"social_media_url\":\"instagram.com/test\"}"
-check "valid complete submission -> ref" 200 '"ref":"DSC-' "$STATUS" "$BODY"
+req POST /api/artists "{\"artist_name\":\"Test Musician\",\"email\":\"artist-$(date +%s)@example.com\",\"creator_type\":\"DJ / MUSIC\",\"genre\":\"hyperpop\",\"phone\":\"2155551234\",\"portfolio_url\":\"soundcloud.com/test\",\"social_media_url\":\"instagram.com/test\"}"
+check "musician submission (creator_type + genre) -> ref" 200 '"ref":"DSC-' "$STATUS" "$BODY"
+
+req POST /api/artists "{\"artist_name\":\"Test Visual Artist\",\"email\":\"visual-$(date +%s)@example.com\",\"creator_type\":\"VISUAL ART\",\"portfolio_url\":\"behance.net/test\"}"
+check "visual artist submission, no genre -> ref (genre never forced)" 200 '"ref":"DSC-' "$STATUS" "$BODY"
+
+req POST /api/artists "{\"artist_name\":\"Test Performer\",\"email\":\"performer-$(date +%s)@example.com\",\"creator_type\":\"PERFORMANCE\",\"portfolio_url\":\"youtube.com/test\"}"
+check "performer submission -> ref" 200 '"ref":"DSC-' "$STATUS" "$BODY"
 
 CROSS_EMAIL="cross-check-$(date +%s)@example.com"
-req POST /api/artists "{\"artist_name\":\"Cross Check\",\"email\":\"$CROSS_EMAIL\",\"genre\":\"house\",\"portfolio_url\":\"x.com\"}"
+req POST /api/artists "{\"artist_name\":\"Cross Check\",\"email\":\"$CROSS_EMAIL\",\"creator_type\":\"OTHER\",\"portfolio_url\":\"x.com\"}"
 check "artist submission with a fresh email -> ref" 200 '"ref":"DSC-' "$STATUS" "$BODY"
 req POST /api/presale "{\"email\":\"$CROSS_EMAIL\"}"
 check "same email via presale afterwards -> new, NOT already (artist never entered Presale)" 200 '"code":"new"' "$STATUS" "$BODY"
 
-req POST /api/artists "{\"artist_name\":\"\",\"email\":\"a@b.com\",\"genre\":\"house\",\"portfolio_url\":\"x.com\"}"
+req POST /api/artists "{\"artist_name\":\"\",\"email\":\"a@b.com\",\"creator_type\":\"OTHER\",\"portfolio_url\":\"x.com\"}"
 check "required field (name) missing -> 400" 400 "ADD A NAME" "$STATUS" "$BODY"
 
-req POST /api/artists '{"artist_name":"Test","email":"bad","genre":"house","portfolio_url":"x.com"}'
+req POST /api/artists '{"artist_name":"Test","email":"bad","creator_type":"OTHER","portfolio_url":"x.com"}'
 check "invalid email -> 400" 400 "error" "$STATUS" "$BODY"
 
-req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist2-$(date +%s)@example.com\",\"genre\":\"house\",\"phone\":\"not a phone at all!!\",\"portfolio_url\":\"x.com\"}"
-check "invalid phone -> 400" 400 "PHONE NUMBER" "$STATUS" "$BODY"
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist-noct-$(date +%s)@example.com\",\"portfolio_url\":\"x.com\"}"
+check "missing creator_type -> 400 (non-musicians no longer forced into a music genre model)" 400 "CREATOR TYPE" "$STATUS" "$BODY"
 
-req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist3-$(date +%s)@example.com\",\"genre\":\"house\",\"portfolio_url\":\"not a url\"}"
-check "invalid portfolio URL -> 400" 400 "PORTFOLIO" "$STATUS" "$BODY"
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist-badct-$(date +%s)@example.com\",\"creator_type\":\"WIZARD\",\"portfolio_url\":\"x.com\"}"
+check "creator_type not in controlled vocabulary -> 400" 400 "CREATOR TYPE" "$STATUS" "$BODY"
 
-req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist4-$(date +%s)@example.com\",\"genre\":\"house\",\"portfolio_url\":\"x.com\",\"social_media_url\":\"not a url\"}"
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist2-$(date +%s)@example.com\",\"creator_type\":\"OTHER\",\"phone\":\"not a phone at all!!\",\"portfolio_url\":\"x.com\"}"
+check "invalid phone -> 400 (phone stays optional but is validated when present)" 400 "PHONE NUMBER" "$STATUS" "$BODY"
+
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist3-$(date +%s)@example.com\",\"creator_type\":\"OTHER\",\"portfolio_url\":\"not a url\"}"
+check "invalid work link -> 400" 400 "WORK LINK" "$STATUS" "$BODY"
+
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist4-$(date +%s)@example.com\",\"creator_type\":\"OTHER\",\"portfolio_url\":\"x.com\",\"social_media_url\":\"not a url\"}"
 check "invalid social URL -> 400" 400 "SOCIAL" "$STATUS" "$BODY"
 
-req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist5-$(date +%s)@example.com\",\"genre\":\"house\",\"portfolio_url\":\"x.com\",\"company\":\"bot\"}"
+req POST /api/artists "{\"artist_name\":\"Test\",\"email\":\"artist5-$(date +%s)@example.com\",\"creator_type\":\"OTHER\",\"portfolio_url\":\"x.com\",\"company\":\"bot\"}"
 check "honeypot populated -> 400, rejected before persistence" 400 "error" "$STATUS" "$BODY"
 
 req POST /api/artists '{not valid json'
 check "malformed JSON -> 400" 400 "BAD REQUEST BODY" "$STATUS" "$BODY"
 
-req POST /api/artists '{"artist_name":"SCHEMA_MISMATCH","email":"schema2@example.com","genre":"house","portfolio_url":"x.com"}'
+req POST /api/artists '{"artist_name":"SCHEMA_MISMATCH","email":"schema2@example.com","creator_type":"OTHER","portfolio_url":"x.com"}'
 check "incorrect spreadsheet schema -> 502, honest failure" 502 "error" "$STATUS" "$BODY"
 
 echo "== health =="

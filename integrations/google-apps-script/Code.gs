@@ -44,7 +44,7 @@ var PRESALE_HEADERS = [
 ];
 
 var ARTISTS_HEADERS = [
-  'created_at', 'ref', 'artist_name', 'genre', 'email', 'phone',
+  'created_at', 'ref', 'artist_name', 'creator_type', 'genre', 'email', 'phone',
   'portfolio_url', 'social_media_url', 'status', 'notes'
 ];
 

@@ -92,6 +92,16 @@ from a different origin during static-only hosting).
    mechanism before connecting anything to `sms_consent`/`email_consent` — see
    "Privacy — what still needs human review" below. Neither is fake, both are
    flagged as draft-pending-review on purpose.
+8. **If Google Sheets/Apps Script is already deployed from an earlier setup**,
+   this pass added a `creator_type` column to the Artists schema. Two manual
+   steps needed on the live deployment before artist submissions will work
+   again: add a `creator_type` header cell to row 1 of the live Artists sheet
+   (insert it right after `artist_name` to match `Code.gs`), then redeploy
+   `Code.gs` (Deploy → New deployment) so `ARTISTS_HEADERS` picks it up. Until
+   both are done, artist submissions will fail loudly with `INVALID SHEET
+   SCHEMA on "Artists": missing column(s): creator_type` rather than silently
+   miswriting data — that's `Code.gs`'s header-validation working as intended,
+   not a new bug.
 
 ## Routes
 
@@ -139,8 +149,8 @@ table together, not just one of them:
 
 **Artists**
 
-| created_at | ref | artist_name | genre | email | phone | portfolio_url | social_media_url | status | notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| created_at | ref | artist_name | creator_type | genre | email | phone | portfolio_url | social_media_url | status | notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 You don't have to create these by hand — `Code.gs` creates whichever sheet is
 missing (with the correct header row) the first time it receives a real
@@ -170,7 +180,40 @@ live spreadsheet against this schema without submitting anything.
 | `ip_address` / `user_agent` | Read server-side from the request in `presale.js`/`artists.js` — see "IP address and user agent" below |
 | `notes` | Always blank on submission — it's an operational field for manual use in Sheets |
 | `ref` (Artists) | `_store.js`, format `DSC-XXXXX`, same generation approach as `lead_id` |
-| `artist_name` / `genre` / `email` / `phone` / `portfolio_url` / `social_media_url` | The visitor's input (name, email, genre, portfolio required; phone, social optional) |
+| `artist_name` / `email` / `portfolio_url` (shown as **WORK LINK**) | The visitor's input — required |
+| `creator_type` | The visitor's input, one of a fixed dropdown (see "Creator type" below) — required, for triage |
+| `genre` (shown as **STYLE / GENRE**) / `phone` / `social_media_url` | The visitor's input — optional |
+
+### Creator type
+
+`creator_type` is a controlled-vocabulary field, not free text — a `<select>`
+on both `artists.html` and in server-side validation (`functions/api/artists.js`),
+kept in sync with the same list in `app.js`:
+
+```
+DJ / MUSIC · PERFORMANCE · VISUAL ART · PHOTO / VIDEO ·
+DESIGN / FASHION · INSTALLATION · DIGITAL / INTERACTIVE · OTHER
+```
+
+It exists so DESCARDED can actually sort/filter submissions by discipline —
+before this field existed, every artist was funneled through a single
+required `genre` field with a music-only placeholder (`HYPERPOP, HOUSE, NO
+WAVE…`), which meant a photographer or installation artist had no honest
+answer to give. `genre` is now separate and optional: a free-text STYLE
+field (house, glitch, mixed media, …) for whoever finds it meaningful, never
+required. `portfolio_url` is presented to visitors as **WORK LINK** — any
+legitimate link to their work (SoundCloud, YouTube, Behance, a personal
+site, a relevant social profile that functions as a portfolio) qualifies;
+it was previously framed as "portfolio," which excluded people who don't
+maintain a dedicated portfolio site.
+
+`creator_type` was added to the production Artists sheet as a new column
+(inserted immediately after `artist_name`) rather than compressed into
+`genre` — the two are different kinds of data (a controlled category vs.
+free-text style) serving different purposes, and cramming them into one
+column would have defeated the point of adding triage in the first place.
+Existing rows are unaffected and simply have a blank `creator_type` cell —
+nothing is backfilled, renamed, or reordered elsewhere.
 
 ### 4. Install the Apps Script
 
@@ -261,8 +304,13 @@ curl -X POST http://localhost:8788/api/presale \
 ```
 curl -X POST http://localhost:8788/api/artists \
   -H 'Content-Type: application/json' \
-  -d '{"artist_name":"Test Artist","email":"a@b.com","genre":"hyperpop","portfolio_url":"soundcloud.com/x"}'
+  -d '{"artist_name":"Test Artist","email":"a@b.com","creator_type":"DJ / MUSIC","genre":"hyperpop","portfolio_url":"soundcloud.com/x"}'
 # -> {"ref":"DSC-XXXXX"} — only after the row is actually written
+
+curl -X POST http://localhost:8788/api/artists \
+  -H 'Content-Type: application/json' \
+  -d '{"artist_name":"Test Visual Artist","email":"b@b.com","creator_type":"VISUAL ART","portfolio_url":"behance.net/x"}'
+# -> {"ref":"DSC-XXXXX"} — genre omitted entirely, still succeeds
 ```
 
 Or run the full scripted matrix (starts against an already-running

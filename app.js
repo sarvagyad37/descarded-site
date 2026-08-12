@@ -201,6 +201,12 @@
   }
 
   /* ── Artist submission form (artists.html only) ── */
+  // Keep in sync with the CREATOR_TYPES list in functions/api/artists.js.
+  var CREATOR_TYPES = [
+    'DJ / MUSIC', 'PERFORMANCE', 'VISUAL ART', 'PHOTO / VIDEO',
+    'DESIGN / FASHION', 'INSTALLATION', 'DIGITAL / INTERACTIVE', 'OTHER'
+  ];
+
   var artistForm = document.querySelector('[data-artist-form]');
   if (artistForm) {
     var aSubmit = document.querySelector('[data-artist-submit]');
@@ -224,6 +230,7 @@
       var data = new FormData(artistForm);
       var artistName = String(data.get('artist_name') || '').trim();
       var email = String(data.get('email') || '').trim();
+      var creatorType = String(data.get('creator_type') || '').trim();
       var genre = String(data.get('genre') || '').trim();
       var phone = String(data.get('phone') || '').trim();
       var portfolioUrl = String(data.get('portfolio_url') || '').trim();
@@ -231,8 +238,8 @@
 
       if (!artistName) return setArtistError('ADD A NAME OR ALIAS.');
       if (!isEmail(email)) return setArtistError("THAT EMAIL DOESN'T LOOK RIGHT.");
-      if (!genre) return setArtistError('ADD A GENRE.');
-      if (!looksLikeUrl(portfolioUrl)) return setArtistError('ADD A VALID PORTFOLIO LINK.');
+      if (CREATOR_TYPES.indexOf(creatorType) === -1) return setArtistError('PICK A CREATOR TYPE.');
+      if (!looksLikeUrl(portfolioUrl)) return setArtistError('ADD A VALID WORK LINK.');
       if (socialMediaUrl && !looksLikeUrl(socialMediaUrl)) return setArtistError("THAT SOCIAL LINK DOESN'T LOOK RIGHT.");
 
       setArtistError(null);
@@ -241,13 +248,14 @@
       var r = await post('/artists', {
         artist_name: artistName,
         email: email,
+        creator_type: creatorType,
         genre: genre,
         phone: phone,
         portfolio_url: portfolioUrl,
         social_media_url: socialMediaUrl
       });
 
-      if (aSubmit) { aSubmit.disabled = false; aSubmit.textContent = 'SEND SUBMISSION'; }
+      if (aSubmit) { aSubmit.disabled = false; aSubmit.textContent = 'SEND WORK  →'; }
 
       if (r.ok === false || !r.ref) {
         // A ref is only ever fabricated server-side after persistence

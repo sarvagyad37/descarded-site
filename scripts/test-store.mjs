@@ -145,20 +145,21 @@ async function run() {
 
   console.log('_store.js — artists');
 
-  await test('artist submission sends final schema fields with generated ref/status', async () => {
+  await test('musician submission sends final schema fields incl. creator_type/genre', async () => {
     let sentBody;
     mockFetch(async (url, opts) => {
       sentBody = JSON.parse(opts.body);
       return Response.json({ ok: true, ref: sentBody.data.ref });
     });
     const result = await addSubmission(ENV, {
-      artistName: 'Test Artist', genre: 'hyperpop', email: 'a@b.com', phone: '+12155551234',
+      artistName: 'Test Artist', creatorType: 'DJ / MUSIC', genre: 'hyperpop', email: 'a@b.com', phone: '+12155551234',
       portfolioUrl: 'soundcloud.com/test', socialMediaUrl: 'instagram.com/test'
     });
     assert.match(result.ref, /^DSC-[A-F0-9]{5}$/);
     assert.equal(sentBody.op, 'artist');
     assert.equal(sentBody.data.ref, result.ref);
     assert.equal(sentBody.data.artist_name, 'Test Artist');
+    assert.equal(sentBody.data.creator_type, 'DJ / MUSIC');
     assert.equal(sentBody.data.genre, 'hyperpop');
     assert.equal(sentBody.data.status, 'new');
     assert.equal(sentBody.data.notes, '');
@@ -166,10 +167,24 @@ async function run() {
     assert.equal('role' in sentBody.data, false);
   });
 
+  await test('visual artist submission: creator_type required, genre blank is fine', async () => {
+    let sentBody;
+    mockFetch(async (url, opts) => {
+      sentBody = JSON.parse(opts.body);
+      return Response.json({ ok: true, ref: sentBody.data.ref });
+    });
+    await addSubmission(ENV, {
+      artistName: 'Visual Test', creatorType: 'VISUAL ART', genre: '', email: 'visual@b.com',
+      portfolioUrl: 'behance.net/test'
+    });
+    assert.equal(sentBody.data.creator_type, 'VISUAL ART');
+    assert.equal(sentBody.data.genre, ''); // never forced — not every discipline has a genre
+  });
+
   await test('artist submission failure throws, no ref surfaced', async () => {
     mockFetch(async () => Response.json({ ok: false, error: 'SERVER BUSY, TRY AGAIN' }));
     await assert.rejects(
-      () => addSubmission(ENV, { artistName: 'Test', email: 'a@b.com', genre: 'house', portfolioUrl: 'x.com' }),
+      () => addSubmission(ENV, { artistName: 'Test', email: 'a@b.com', creatorType: 'VISUAL ART', portfolioUrl: 'x.com' }),
       (e) => e instanceof StoreError && e.message === 'SERVER BUSY, TRY AGAIN'
     );
   });
@@ -180,9 +195,20 @@ async function run() {
       sentOp = JSON.parse(opts.body).op;
       return Response.json({ ok: true, ref: 'DSC-ABCDE' });
     });
-    await addSubmission(ENV, { artistName: 'Test', email: 'a@b.com', genre: 'house', portfolioUrl: 'x.com' });
+    await addSubmission(ENV, { artistName: 'Test', email: 'a@b.com', creatorType: 'PERFORMANCE', portfolioUrl: 'x.com' });
     assert.equal(sentOp, 'artist');
     assert.notEqual(sentOp, 'presale');
+  });
+
+  await test('artist submission never sets email_consent/sms_consent (presale-only concept)', async () => {
+    let sentBody;
+    mockFetch(async (url, opts) => {
+      sentBody = JSON.parse(opts.body);
+      return Response.json({ ok: true, ref: sentBody.data.ref });
+    });
+    await addSubmission(ENV, { artistName: 'Test', email: 'a@b.com', creatorType: 'OTHER', portfolioUrl: 'x.com' });
+    assert.equal('email_consent' in sentBody.data, false);
+    assert.equal('sms_consent' in sentBody.data, false);
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);
