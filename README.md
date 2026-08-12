@@ -8,6 +8,9 @@ client-side.
 Replaces the earlier single-file Artifact export at `../site/deploy/` (kept as-is,
 not part of this build).
 
+See `KNOWN_ISSUES.md` for an open, unfixed issue (Apps Script latency /
+occasional false-failure-despite-success) before touching persistence code.
+
 ## Run locally
 
 Any static file server works, e.g.:
