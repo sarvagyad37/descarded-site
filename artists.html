@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artists — DESCARDED</title>
+<meta name="description" content="DJs, performers, visual artists and other creators can send work for future DESCARDED editions.">
+<meta name="theme-color" content="#070707">
+<!-- TODO: set once the production domain is live -->
+<!-- <link rel="canonical" href="https://REPLACE-WITH-DOMAIN/artists.html"> -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DESCARDED">
+<meta property="og:title" content="Artists — DESCARDED">
+<meta property="og:description" content="DJs, performers, visual artists and other creators can send work for future DESCARDED editions.">
+<meta property="og:image" content="/assets/hero-still-life.jpg">
+<!-- <meta property="og:url" content="https://REPLACE-WITH-DOMAIN/artists.html"> -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Artists — DESCARDED">
+<meta name="twitter:description" content="DJs, performers, visual artists and other creators can send work for future DESCARDED editions.">
+<meta name="twitter:image" content="/assets/hero-still-life.jpg">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23070707'/%3E%3Ctext x='50' y='68' font-family='Arial,sans-serif' font-size='60' font-weight='900' fill='%23f3b700' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@800&family=Chivo:ital,wght@0,400;0,500;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .artists-hero {
+    position: relative; min-height: calc(100vh - 44px);
+    display: flex; align-items: center; overflow: hidden;
+  }
+  .artists-hero-bg {
+    position: absolute; inset: 0;
+    background-image: url("/assets/hero-still-life.jpg");
+    background-size: cover; background-position: 20% 44%;
+  }
+  .artists-hero-scrim { position: absolute; inset: 0; background: rgba(7,7,7,.91); }
+  .artists-hero-content {
+    position: relative; width: 100%; max-width: 1440px; margin: 0 auto;
+    padding: 150px clamp(20px,4vw,46px) 68px;
+    display: flex; gap: clamp(26px,4.4vw,64px); flex-wrap: wrap; align-items: center;
+  }
+  .artists-intro { flex: 1 1 420px; min-width: 0; }
+  .artists-h1 { font: 800 clamp(20px,4.6vw,42px)/1 'Unbounded', sans-serif; letter-spacing: -.02em; }
+  .artists-h1 .accent { color: var(--pink); }
+  .artists-body { margin-top: 26px; display: flex; flex-direction: column; gap: 16px; font: 400 16px/1.7 'Chivo', sans-serif; letter-spacing: .05em; color: rgba(255,255,255,.86); max-width: 60ch; }
+  .artists-note { margin-top: 16px; font: 600 10px/1.7 'Chivo', sans-serif; letter-spacing: .16em; color: rgba(255,255,255,.5); max-width: 56ch; }
+
+  .artists-form-wrap { flex: 1 1 520px; min-width: 0; }
+  .artist-form {
+    background: rgba(0,0,0,.66); border: 1px solid rgba(255,255,255,.18);
+    padding: clamp(20px,3vw,32px); display: flex; flex-direction: column; gap: 16px;
+  }
+  .field-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .field-row .field-group { flex: 1 1 200px; }
+  .artist-submit { width: 100%; padding: 17px 0 16px; font-size: clamp(16px,2.6vw,22px); }
+  .artist-submit:disabled { opacity: .6; cursor: default; }
+
+  .artist-result {
+    background: rgba(0,0,0,.66); border: 1px solid var(--yellow);
+    padding: clamp(26px,3.4vw,42px); display: flex; flex-direction: column; gap: 16px;
+  }
+  .artist-result-mark {
+    width: 42px; height: 42px; background: var(--yellow); color: #0a0a0a;
+    display: flex; align-items: center; justify-content: center; font: 900 26px/1 'Chivo', sans-serif;
+  }
+  .artist-result h2 { font: 800 clamp(26px,4.2vw,36px)/1 'Unbounded', sans-serif; letter-spacing: -.02em; }
+  .artist-result p { font: 400 16px/1.7 'Chivo', sans-serif; letter-spacing: .05em; color: rgba(255,255,255,.82); }
+  .artist-result-ref { font: 600 10px/1.7 'Chivo', sans-serif; letter-spacing: .1em; color: rgba(255,255,255,.45); }
+  .artist-reset {
+    align-self: flex-start; background: none; border: 1px solid rgba(255,255,255,.36); color: #fff;
+    font: 900 16px/1 'Chivo', sans-serif; letter-spacing: -.02em; padding: 14px 24px 13px; cursor: pointer;
+  }
+  .artist-reset:hover { border-color: #fff; background: rgba(255,255,255,.07); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true">
+  <defs>
+    <filter id="dscPaper" x="-14%" y="-24%" width="128%" height="148%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.022 0.055" numOctaves="4" seed="9" result="w"></feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="11" xChannelSelector="R" yChannelSelector="G" result="d"></feDisplacementMap>
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="4" result="g"></feTurbulence>
+      <feColorMatrix in="g" type="saturate" values="0" result="gs"></feColorMatrix>
+      <feComponentTransfer in="gs" result="gt"><feFuncA type="linear" slope="0.22" intercept="0"></feFuncA></feComponentTransfer>
+      <feComposite in="gt" in2="d" operator="in" result="gi"></feComposite>
+      <feBlend in="d" in2="gi" mode="multiply"></feBlend>
+    </filter>
+    <filter id="dscPaperSm" x="-16%" y="-30%" width="132%" height="160%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.09" numOctaves="4" seed="3" result="w"></feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="6" xChannelSelector="R" yChannelSelector="G" result="d"></feDisplacementMap>
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="6" result="g"></feTurbulence>
+      <feColorMatrix in="g" type="saturate" values="0" result="gs"></feColorMatrix>
+      <feComponentTransfer in="gs" result="gt"><feFuncA type="linear" slope="0.2" intercept="0"></feFuncA></feComponentTransfer>
+      <feComposite in="gt" in2="d" operator="in" result="gi"></feComposite>
+      <feBlend in="d" in2="gi" mode="multiply"></feBlend>
+    </filter>
+  </defs>
+</svg>
+
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<!-- NAV:START -->
+<header class="site-header">
+  <div class="site-header-inner">
+    <a class="brand-lockup" href="/"><span class="brand-mark">DESCARDED</span><span class="brand-plus on-photo">+ + + + +</span></a>
+
+    <nav class="nav-primary" aria-label="Primary">
+      <a href="/about.html">ABOUT</a>
+      <a href="/artists.html" aria-current="page">ARTISTS</a>
+      <button type="button" class="nav-cta" data-open-presale>JOIN PRE-SALE</button>
+    </nav>
+
+    <button type="button" class="menu-toggle" data-menu-toggle aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu">
+      <span></span>
+      <span></span>
+      <span class="close-glyph" aria-hidden="true">&times;</span>
+    </button>
+  </div>
+</header>
+
+<div id="mobile-menu" class="mobile-menu" data-mobile-menu hidden>
+  <div class="mobile-menu-top">
+    <a class="brand-lockup" href="/"><span class="brand-mark">DESCARDED</span><span class="brand-plus on-dark">+ + + + +</span></a>
+  </div>
+  <nav class="mobile-nav" aria-label="Primary">
+    <a href="/">HOME</a>
+    <a href="/about.html">ABOUT</a>
+    <a href="/artists.html" aria-current="page">ARTISTS</a>
+  </nav>
+  <div class="mobile-menu-secondary">EDITION 01 <span class="accent">— PHILADELPHIA</span><br>SEPT 24–26, 2026</div>
+  <div class="mobile-menu-cta">
+    <button type="button" data-open-presale>JOIN PRE-SALE&nbsp; →</button>
+  </div>
+</div>
+<!-- NAV:END -->
+
+<main id="main">
+  <section class="artists-hero" data-screen-label="Artists">
+    <div class="artists-hero-bg"></div>
+    <div class="artists-hero-scrim"></div>
+    <div class="artists-hero-content">
+      <div class="artists-intro">
+        <h1 class="artists-h1">ARTISTS<span class="accent">.</span></h1>
+        <div class="artists-body">
+          <p>IF YOUR WORK COULD CHANGE THE ROOM, SEND IT.</p>
+          <p>DJS, PERFORMERS, VISUAL ARTISTS + OTHER CREATORS CAN SEND WORK FOR FUTURE DESCARDED EDITIONS.</p>
+        </div>
+        <div class="artists-note">SUBMITTING WORK IS NOT A BOOKING OR A PROMISE OF A REPLY. IF THERE'S A FIT, DESCARDED CAN FOLLOW UP.</div>
+      </div>
+
+      <div class="artists-form-wrap">
+        <div data-artist-form-view>
+          <form class="artist-form" data-artist-form novalidate>
+            <div class="field-row">
+              <div class="field-group">
+                <label class="field-label" for="a-name">ARTIST NAME / ALIAS</label>
+                <input class="field-input" id="a-name" name="name" type="text" required>
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="a-email">EMAIL</label>
+                <input class="field-input" id="a-email" name="email" type="email" autocomplete="email" required>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field-group">
+                <label class="field-label" for="a-city">CITY</label>
+                <input class="field-input" id="a-city" name="city" type="text" required>
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="a-role">ROLE</label>
+                <select class="field-select" id="a-role" name="role" required>
+                  <option value="">SELECT ONE</option>
+                  <option value="DJ">DJ</option>
+                  <option value="PERFORMER">PERFORMER</option>
+                  <option value="VISUAL ARTIST">VISUAL ARTIST</option>
+                  <option value="MUSICIAN">MUSICIAN</option>
+                  <option value="PRODUCER">PRODUCER</option>
+                  <option value="DESIGNER">DESIGNER</option>
+                  <option value="OTHER">OTHER</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="a-link1">PRIMARY WORK LINK</label>
+              <input class="field-input" id="a-link1" name="link1" type="text" placeholder="SOUNDCLOUD / PORTFOLIO / REEL" required>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="a-link2">OPTIONAL SECOND LINK</label>
+              <input class="field-input" id="a-link2" name="link2" type="text">
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="a-notes">WHAT SHOULD WE KNOW?</label>
+              <textarea class="field-textarea" id="a-notes" name="notes" rows="3"></textarea>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="a-social">OPTIONAL SOCIAL</label>
+              <input class="field-input" id="a-social" name="social" type="text">
+            </div>
+
+            <div class="sr-only" aria-hidden="true">
+              <label for="a-company">Leave this field blank</label>
+              <input type="text" id="a-company" name="company" tabindex="-1" autocomplete="off" data-artist-honeypot>
+            </div>
+
+            <p class="field-error" data-artist-error role="alert" hidden></p>
+
+            <button type="submit" class="send-submission artist-submit" data-artist-submit>SEND SUBMISSION</button>
+          </form>
+        </div>
+
+        <div class="artist-result" data-artist-result-view hidden>
+          <div class="artist-result-mark">✓</div>
+          <h2>SUBMISSION RECEIVED<span class="accent" style="color:var(--pink)">.</span></h2>
+          <p>IF THERE'S A FIT, DESCARDED CAN FOLLOW UP.</p>
+          <p class="artist-result-ref" data-artist-ref></p>
+          <button type="button" class="artist-reset" data-artist-reset>SEND ANOTHER</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <span class="brand-mark">DESCARDED<span style="color:var(--pink)">.</span></span>
+        <span class="brand-plus on-dark">+ + + + +</span>
+        <div class="footer-facts">EDITION 01 — PHILADELPHIA<br>SEPT 24–26, 2026</div>
+      </div>
+      <div class="footer-nav">
+        <span class="footer-nav-title">EVENT</span>
+        <a href="/about.html">ABOUT</a>
+        <a href="/artists.html">ARTISTS</a>
+        <button type="button" class="footer-cta" data-open-presale>PRE-SALE</button>
+      </div>
+    </div>
+    <div class="site-footer-legal">
+      <span>© 2026 DESCARDED</span>
+      <div class="footer-links">
+        <a href="/conduct.html">CONDUCT</a>
+        <a href="/privacy.html">PRIVACY</a>
+        <a href="/contact.html">CONTACT</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<div class="presale-backdrop" data-presale-backdrop hidden></div>
+
+<div class="presale-panel" data-presale-panel role="dialog" aria-modal="true" aria-label="Pre-sale access" hidden>
+  <div data-presale-form-view>
+    <div class="presale-head">
+      <h2>PRE-SALE ACCESS</h2>
+      <button type="button" class="presale-close" data-close-presale aria-label="Close">&times;</button>
+    </div>
+
+    <p class="presale-payoff">GET THE VENUE + FIRST TICKET RELEASE.</p>
+
+    <form data-presale-form novalidate>
+      <div class="field-group">
+        <label class="field-label" for="presale-email">EMAIL</label>
+        <input class="field-input" type="email" id="presale-email" name="email" autocomplete="email" required data-presale-email aria-describedby="presale-email-error">
+      </div>
+      <p class="field-error" id="presale-email-error" data-presale-field-error role="alert" hidden></p>
+
+      <div class="sr-only" aria-hidden="true">
+        <label for="presale-company">Leave this field blank</label>
+        <input type="text" id="presale-company" name="company" tabindex="-1" autocomplete="off" data-presale-honeypot>
+      </div>
+
+      <button type="submit" class="presale-submit" data-presale-submit>JOIN</button>
+      <p class="presale-status" data-presale-status role="status" aria-live="polite" hidden></p>
+    </form>
+
+    <p class="presale-privacy">WE'LL SEND DESCARDED EVENT UPDATES TO THIS EMAIL. UNSUBSCRIBE ANY TIME.</p>
+  </div>
+
+  <div class="presale-result" data-presale-result-view role="status" aria-live="polite" hidden>
+    <h2 data-presale-result-headline></h2>
+    <p data-presale-result-body></p>
+    <button type="button" class="presale-result-done" data-close-presale>DONE</button>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — DESCARDED</title>
+<meta name="description" content="DESCARDED makes physical events around culture that people usually meet through a screen — music, art, games, characters, scenes, obsessions and the worlds around them.">
+<meta name="theme-color" content="#070707">
+<!-- TODO: set once the production domain is live -->
+<!-- <link rel="canonical" href="https://REPLACE-WITH-DOMAIN/about.html"> -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DESCARDED">
+<meta property="og:title" content="About — DESCARDED">
+<meta property="og:description" content="DESCARDED makes physical events around culture that people usually meet through a screen.">
+<meta property="og:image" content="/assets/hero-still-life.jpg">
+<!-- <meta property="og:url" content="https://REPLACE-WITH-DOMAIN/about.html"> -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="About — DESCARDED">
+<meta name="twitter:description" content="DESCARDED makes physical events around culture that people usually meet through a screen.">
+<meta name="twitter:image" content="/assets/hero-still-life.jpg">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23070707'/%3E%3Ctext x='50' y='68' font-family='Arial,sans-serif' font-size='60' font-weight='900' fill='%23f3b700' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@800&family=Chivo:ital,wght@0,400;0,500;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .about-hero {
+    position: relative; min-height: calc(100vh - 44px);
+    display: flex; align-items: center; overflow: hidden;
+  }
+  .about-hero-bg {
+    position: absolute; inset: 0;
+    background-image: url("/assets/hero-still-life.jpg");
+    background-size: cover; background-position: 78% 44%;
+  }
+  .about-hero-scrim { position: absolute; inset: 0; background: rgba(7,7,7,.9); }
+  .about-hero-content {
+    position: relative; width: 100%; max-width: 1440px; margin: 0 auto;
+    padding: 150px clamp(20px,4vw,46px) 68px;
+    display: flex; gap: clamp(26px,4.2vw,60px); flex-wrap: wrap; align-items: flex-start;
+  }
+  .about-rail { flex: 0 0 260px; display: flex; flex-direction: column; gap: 16px; }
+  .about-rail-rule { height: 1px; background: rgba(255,255,255,.3); }
+  .about-rail-facts { font: 600 10px/1.9 'Chivo', sans-serif; letter-spacing: .22em; color: var(--muted); }
+  .about-rail-facts .accent-yellow { color: var(--yellow); }
+  .about-main { flex: 1 1 520px; min-width: 0; }
+  .about-h1 { font: 800 clamp(20px,4.6vw,42px)/1 'Unbounded', sans-serif; letter-spacing: -.02em; }
+  .about-h1 .accent { color: var(--pink); }
+  .about-body { margin-top: 26px; display: flex; flex-direction: column; gap: 16px; font: 400 16px/1.7 'Chivo', sans-serif; letter-spacing: .05em; color: rgba(255,255,255,.88); max-width: 62ch; }
+  .about-cta { margin-top: 26px; display: inline-block; font-size: clamp(16px,2.6vw,26px); padding: 18px 32px 17px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true">
+  <defs>
+    <filter id="dscPaper" x="-14%" y="-24%" width="128%" height="148%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.022 0.055" numOctaves="4" seed="9" result="w"></feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="11" xChannelSelector="R" yChannelSelector="G" result="d"></feDisplacementMap>
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="4" result="g"></feTurbulence>
+      <feColorMatrix in="g" type="saturate" values="0" result="gs"></feColorMatrix>
+      <feComponentTransfer in="gs" result="gt"><feFuncA type="linear" slope="0.22" intercept="0"></feFuncA></feComponentTransfer>
+      <feComposite in="gt" in2="d" operator="in" result="gi"></feComposite>
+      <feBlend in="d" in2="gi" mode="multiply"></feBlend>
+    </filter>
+    <filter id="dscPaperSm" x="-16%" y="-30%" width="132%" height="160%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.09" numOctaves="4" seed="3" result="w"></feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="6" xChannelSelector="R" yChannelSelector="G" result="d"></feDisplacementMap>
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="6" result="g"></feTurbulence>
+      <feColorMatrix in="g" type="saturate" values="0" result="gs"></feColorMatrix>
+      <feComponentTransfer in="gs" result="gt"><feFuncA type="linear" slope="0.2" intercept="0"></feFuncA></feComponentTransfer>
+      <feComposite in="gt" in2="d" operator="in" result="gi"></feComposite>
+      <feBlend in="d" in2="gi" mode="multiply"></feBlend>
+    </filter>
+  </defs>
+</svg>
+
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<!-- NAV:START -->
+<header class="site-header">
+  <div class="site-header-inner">
+    <a class="brand-lockup" href="/"><span class="brand-mark">DESCARDED</span><span class="brand-plus on-photo">+ + + + +</span></a>
+
+    <nav class="nav-primary" aria-label="Primary">
+      <a href="/about.html" aria-current="page">ABOUT</a>
+      <a href="/artists.html">ARTISTS</a>
+      <button type="button" class="nav-cta" data-open-presale>JOIN PRE-SALE</button>
+    </nav>
+
+    <button type="button" class="menu-toggle" data-menu-toggle aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu">
+      <span></span>
+      <span></span>
+      <span class="close-glyph" aria-hidden="true">&times;</span>
+    </button>
+  </div>
+</header>
+
+<div id="mobile-menu" class="mobile-menu" data-mobile-menu hidden>
+  <div class="mobile-menu-top">
+    <a class="brand-lockup" href="/"><span class="brand-mark">DESCARDED</span><span class="brand-plus on-dark">+ + + + +</span></a>
+  </div>
+  <nav class="mobile-nav" aria-label="Primary">
+    <a href="/">HOME</a>
+    <a href="/about.html" aria-current="page">ABOUT</a>
+    <a href="/artists.html">ARTISTS</a>
+  </nav>
+  <div class="mobile-menu-secondary">EDITION 01 <span class="accent">— PHILADELPHIA</span><br>SEPT 24–26, 2026</div>
+  <div class="mobile-menu-cta">
+    <button type="button" data-open-presale>JOIN PRE-SALE&nbsp; →</button>
+  </div>
+</div>
+<!-- NAV:END -->
+
+<main id="main">
+  <section class="about-hero" data-screen-label="About">
+    <div class="about-hero-bg"></div>
+    <div class="about-hero-scrim"></div>
+    <div class="about-hero-content">
+      <div class="about-rail">
+        <div class="about-rail-rule"></div>
+        <div class="about-rail-facts">EDITION 01<br><span class="accent-yellow">PHILADELPHIA</span><br>SEPT 24–26, 2026</div>
+        <div class="about-rail-rule"></div>
+      </div>
+      <div class="about-main">
+        <h1 class="about-h1">ABOUT<br>DESCARDED<span class="accent">.</span></h1>
+        <div class="about-body">
+          <p>THE INTERNET CHANGED WHAT PEOPLE CARE ABOUT. IT DIDN'T REPLACE BEING IN A ROOM TOGETHER.</p>
+          <p>DESCARDED MAKES PHYSICAL EVENTS AROUND CULTURE THAT PEOPLE USUALLY MEET THROUGH A SCREEN — MUSIC, ART, GAMES, CHARACTERS, SCENES, OBSESSIONS AND THE WORLDS AROUND THEM.</p>
+          <p>THE POINT ISN'T TO RECREATE THE INTERNET IN A VENUE. IT'S TO GIVE THE RIGHT IDEA A PHYSICAL FORM: A ROOM, A SOUND, A LOOK AND A REASON TO SHOW UP.</p>
+          <p>EACH EDITION CAN CHANGE. THE STANDARD DOESN'T: THE IDEA HAS TO DESERVE THE ROOM.</p>
+        </div>
+        <button type="button" class="nav-cta about-cta" data-open-presale>JOIN PRE-SALE&nbsp; →</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <span class="brand-mark">DESCARDED<span style="color:var(--pink)">.</span></span>
+        <span class="brand-plus on-dark">+ + + + +</span>
+        <div class="footer-facts">EDITION 01 — PHILADELPHIA<br>SEPT 24–26, 2026</div>
+      </div>
+      <div class="footer-nav">
+        <span class="footer-nav-title">EVENT</span>
+        <a href="/about.html">ABOUT</a>
+        <a href="/artists.html">ARTISTS</a>
+        <button type="button" class="footer-cta" data-open-presale>PRE-SALE</button>
+      </div>
+    </div>
+    <div class="site-footer-legal">
+      <span>© 2026 DESCARDED</span>
+      <div class="footer-links">
+        <a href="/conduct.html">CONDUCT</a>
+        <a href="/privacy.html">PRIVACY</a>
+        <a href="/contact.html">CONTACT</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<div class="presale-backdrop" data-presale-backdrop hidden></div>
+
+<div class="presale-panel" data-presale-panel role="dialog" aria-modal="true" aria-label="Pre-sale access" hidden>
+  <div data-presale-form-view>
+    <div class="presale-head">
+      <h2>PRE-SALE ACCESS</h2>
+      <button type="button" class="presale-close" data-close-presale aria-label="Close">&times;</button>
+    </div>
+
+    <p class="presale-payoff">GET THE VENUE + FIRST TICKET RELEASE.</p>
+
+    <form data-presale-form novalidate>
+      <div class="field-group">
+        <label class="field-label" for="presale-email">EMAIL</label>
+        <input class="field-input" type="email" id="presale-email" name="email" autocomplete="email" required data-presale-email aria-describedby="presale-email-error">
+      </div>
+      <p class="field-error" id="presale-email-error" data-presale-field-error role="alert" hidden></p>
+
+      <div class="sr-only" aria-hidden="true">
+        <label for="presale-company">Leave this field blank</label>
+        <input type="text" id="presale-company" name="company" tabindex="-1" autocomplete="off" data-presale-honeypot>
+      </div>
+
+      <button type="submit" class="presale-submit" data-presale-submit>JOIN</button>
+      <p class="presale-status" data-presale-status role="status" aria-live="polite" hidden></p>
+    </form>
+
+    <p class="presale-privacy">WE'LL SEND DESCARDED EVENT UPDATES TO THIS EMAIL. UNSUBSCRIBE ANY TIME.</p>
+  </div>
+
+  <div class="presale-result" data-presale-result-view role="status" aria-live="polite" hidden>
+    <h2 data-presale-result-headline></h2>
+    <p data-presale-result-body></p>
+    <button type="button" class="presale-result-done" data-close-presale>DONE</button>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
