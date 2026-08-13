@@ -7,8 +7,12 @@
 functions/
 integrations/
 scripts/
+migrations/
+wrangler.toml
 .dev.vars
 .dev.vars.example
 .gitignore
 .assetsignore
 README.md
+KNOWN_ISSUES.md
+docs/

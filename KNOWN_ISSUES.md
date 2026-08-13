@@ -1,6 +1,20 @@
 # Known issues
 
-## Apps Script latency / false-failure-despite-success (open, not investigated)
+## Apps Script latency / false-failure-despite-success (resolved for the visitor-facing path)
+
+**Update, D1 migration:** This issue is what motivated moving D1 in as the
+source of truth (see README.md → "Architecture"). The visitor-facing
+response no longer waits on Apps Script at all — it returns as soon as D1
+confirms the write, and Google Sheets is written in the background via
+`context.waitUntil(...)`. A slow or failing Apps Script call can no longer
+produce a false failure shown to a visitor, and can no longer race a retry
+into a duplicate row (D1's unique constraints plus `Code.gs`'s new ref-based
+artist dedup — see README → "D1 persistence" → "Duplicate handling").
+Apps Script's underlying latency/variability itself is unchanged and out of
+scope — it just no longer matters to the visitor. The original report is
+kept below for record.
+
+**Original report, before the D1 migration:**
 
 **Observed:** 2026-08-12, during production setup and again during final
 verification. Live requests to `/api/presale` and `/api/artists` — which

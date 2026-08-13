@@ -19,6 +19,10 @@ import { createServer } from 'node:http';
 
 const PORT = Number(process.argv[2] || process.env.MOCK_PORT || 8791);
 const SECRET = process.env.MOCK_SECRET || 'test-shared-secret';
+// Artificial latency, for measure-latency.mjs demonstrations only — real
+// Apps Script has no such knob. Simulates the 2s-33s round trips logged in
+// KNOWN_ISSUES.md to prove the D1-primary write path doesn't wait on them.
+const DELAY_MS = Number(process.env.MOCK_DELAY_MS || 0);
 
 const presaleEmails = new Map(); // normalized email -> row
 const artistSubmissions = [];
@@ -39,7 +43,20 @@ function send(res, status, payload) {
 }
 
 const server = createServer(async (req, res) => {
+  // Test-only introspection, not part of the real Apps Script contract —
+  // lets scripts/test-api.sh verify retry-safety (no duplicate rows) from
+  // outside without needing direct access to this module's in-memory state.
+  if (req.method === 'GET' && req.url === '/_debug') {
+    return send(res, 200, {
+      presaleCount: presaleEmails.size,
+      artistCount: artistSubmissions.length,
+      artistRefs: artistSubmissions.map((s) => s.ref)
+    });
+  }
+
   if (req.method !== 'POST') return send(res, 405, { ok: false, error: 'METHOD NOT ALLOWED' });
+
+  if (DELAY_MS > 0) await new Promise((r) => setTimeout(r, DELAY_MS));
 
   const raw = await readBody(req);
   let body;
@@ -70,6 +87,11 @@ const server = createServer(async (req, res) => {
     if (!data.ref) return send(res, 200, { ok: false, error: 'MISSING REF' });
     if (data.artist_name === 'SCHEMA_MISMATCH') {
       return send(res, 200, { ok: false, error: 'INVALID SHEET SCHEMA on "Artists": missing column(s): genre' });
+    }
+    // Mirrors Code.gs's ref-based dedup: a retried background sync for the
+    // same D1 row must not create a second row.
+    if (artistSubmissions.some((s) => s.ref === data.ref)) {
+      return send(res, 200, { ok: true, ref: data.ref });
     }
     artistSubmissions.push({ ...data, created_at: new Date().toISOString() });
     return send(res, 200, { ok: true, ref: data.ref });

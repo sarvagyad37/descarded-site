@@ -3,13 +3,18 @@
            source, campaign, medium, term, content, referred_by, company }
    -> 200 { code: "new" | "already" }
    -> 400 { error }   (bad input, rejected before touching persistence)
-   -> 502 { error }   (persistence unreachable/rejected — nothing was saved)
+   -> 502 { error }   (D1 unavailable/rejected — nothing was saved)
+
+   D1 is the source of truth and the only thing this handler waits on.
+   Google Sheets is an operational mirror, synced in the background via
+   context.waitUntil(...) AFTER D1 confirms the write — see _store.js. A
+   Google failure never turns a successful D1 write into a failed response.
 
    "company" is the honeypot field. It's hidden from real users by CSS; if
    it's non-empty the request is treated as automated and rejected without
-   ever reaching Google Sheets. This is server-side enforcement — the
-   client-side honeypot check in app.js is not sufficient on its own since
-   a bot can POST here directly.
+   ever reaching D1. This is server-side enforcement — the client-side
+   honeypot check in app.js is not sufficient on its own since a bot can
+   POST here directly.
 
    email_consent is not accepted from the client at all — every successful
    submission through this endpoint implies it, because the modal discloses
@@ -22,9 +27,16 @@
    ip_address and user_agent are read server-side from the request itself
    (CF-Connecting-IP is set by Cloudflare's edge and can't be spoofed by
    the client; the browser never sends its own IP). Neither is obtainable
-   or exposed client-side. */
+   or exposed client-side.
 
-import { addSubscriber, StoreError } from './_store.js';
+   Duplicate handling: email is a UNIQUE-indexed D1 column (normalized,
+   trimmed + lowercased before insert). Two simultaneous submissions for the
+   same email race at the D1 layer itself — one INSERT wins, the other
+   throws a UNIQUE constraint error, which insertPresale() turns into
+   { code: "already" }. No application-level lock is involved. */
+
+import { insertPresale, DbError } from './_db.js';
+import { syncPresaleToGoogle, generateLeadId, generateReferralCode } from './_store.js';
 import { isEmail, readJson, normalizePhone, json } from './_util.js';
 
 const MAX_LEN = {
@@ -37,7 +49,9 @@ function tooLong(v, max) {
   return typeof v === 'string' && v.length > max;
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, waitUntil }) {
+  const validationStart = Date.now();
+
   const body = await readJson(request);
   if (!body) return json(400, { error: 'BAD REQUEST BODY.' });
 
@@ -61,30 +75,51 @@ export async function onRequestPost({ request, env }) {
 
   const ipAddress = request.headers.get('CF-Connecting-IP') || '';
   const userAgent = (request.headers.get('User-Agent') || '').slice(0, 500);
+  const email = String(body.email).trim().toLowerCase();
+  const validationMs = Date.now() - validationStart;
 
+  const row = {
+    lead_id: generateLeadId(),
+    phone: phone.value,
+    referral_code: generateReferralCode(),
+    email_consent: true,
+    sms_consent: smsConsent,
+    referred_by: body.referred_by || '',
+    first_name: typeof body.first_name === 'string' ? body.first_name.trim() : '',
+    last_name: typeof body.last_name === 'string' ? body.last_name.trim() : '',
+    email,
+    status: 'active',
+    source: body.source || '',
+    campaign: body.campaign || '',
+    medium: body.medium || '',
+    term: body.term || '',
+    content: body.content || '',
+    ip_address: ipAddress,
+    user_agent: userAgent,
+    notes: ''
+  };
+
+  const d1Start = Date.now();
+  let result;
   try {
-    const { code } = await addSubscriber(env, {
-      email: body.email,
-      firstName: typeof body.first_name === 'string' ? body.first_name.trim() : '',
-      lastName: typeof body.last_name === 'string' ? body.last_name.trim() : '',
-      phone: phone.value,
-      smsConsent,
-      referredBy: body.referred_by,
-      source: body.source,
-      campaign: body.campaign,
-      medium: body.medium,
-      term: body.term,
-      content: body.content,
-      ipAddress,
-      userAgent
-    });
-    return json(200, { code, email: String(body.email).trim().toLowerCase() });
+    result = await insertPresale(env, row);
   } catch (e) {
-    if (e instanceof StoreError) {
+    if (e instanceof DbError) {
       return json(502, { error: "COULDN'T JOIN. NOTHING WAS SUBMITTED. CHECK THE EMAIL AND TRY AGAIN." });
     }
     return json(500, { error: 'SOMETHING WENT WRONG. TRY AGAIN.' });
   }
+  const d1Ms = Date.now() - d1Start;
+
+  if (result.code === 'new') {
+    waitUntil(syncPresaleToGoogle(env, row));
+  }
+
+  const extraHeaders = env.DEBUG_TIMING === 'true'
+    ? { 'X-Timing-Validation-Ms': String(validationMs), 'X-Timing-D1-Ms': String(d1Ms) }
+    : undefined;
+
+  return json(200, { code: result.code, email }, extraHeaders);
 }
 
 export async function onRequestOptions() {

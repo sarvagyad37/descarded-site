@@ -1,13 +1,27 @@
 #!/bin/sh
 # Integration test matrix against a running `wrangler pages dev` (expects it
-# on :8788) with the mock Apps Script (expects it on :8791, secret
-# "test-shared-secret", started separately). Not run in CI automatically —
-# see README "Google Sheets persistence" → Testing.
+# on :8788, D1 binding DB migrated locally) with the mock Apps Script
+# (expects it on :8791, secret "test-shared-secret", started separately).
+# Not run in CI automatically — see README "D1 persistence" → Testing.
+#
+# D1-unavailable/failure is intentionally NOT covered here (there's no
+# black-box HTTP way to break the local D1 binding mid-run) — see
+# scripts/test-db.mjs for that case, covered at the unit level with a
+# mocked D1 binding instead.
 
 set -e
 BASE="http://localhost:8788"
 PASS=0
 FAIL=0
+
+# Reads one column for a WHERE key = value lookup from the local D1 db via
+# `wrangler d1 execute --json`, without needing jq.
+d1_field() {
+  # d1_field TABLE COLUMN WHERE_COLUMN WHERE_VALUE
+  npx wrangler d1 execute DB --local --json \
+    --command "SELECT $2 as v FROM $1 WHERE $3 = '$4' LIMIT 1;" 2>/dev/null \
+    | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const r=JSON.parse(d);const row=r[0]&&r[0].results&&r[0].results[0];process.stdout.write(row?String(row.v):'');}catch(e){}})"
+}
 
 check() {
   desc="$1"; expected_status="$2"; expected_grep="$3"; actual_status="$4"; actual_body="$5"
@@ -31,6 +45,12 @@ req() {
 
 RAND_EMAIL="test-$(date +%s)@example.com"
 
+# Fixed-literal fixture rows (schema-mismatch@example.com / SCHEMA_MISMATCH)
+# now persist in D1 across runs (unlike the old architecture, where a Google
+# failure meant nothing was ever saved) — clear them first so the suite is
+# repeatable.
+npx wrangler d1 execute DB --local --command "DELETE FROM presale WHERE email = 'schema-mismatch@example.com'; DELETE FROM artists WHERE artist_name = 'SCHEMA_MISMATCH';" > /dev/null 2>&1 || true
+
 echo "== presale =="
 
 req POST /api/presale "{\"email\":\"$RAND_EMAIL\"}"
@@ -53,6 +73,22 @@ check "sms_consent true without phone -> 400" 400 "PHONE NUMBER" "$STATUS" "$BOD
 
 req POST /api/presale "{\"email\":\"$RAND_EMAIL\"}"
 check "duplicate normalized email -> already" 200 '"code":"already"' "$STATUS" "$BODY"
+
+echo "== presale: concurrent duplicate =="
+
+CONC_EMAIL="conc-$(date +%s)@example.com"
+curl -s -X POST "$BASE/api/presale" -H 'Content-Type: application/json' -d "{\"email\":\"$CONC_EMAIL\"}" > /tmp/conc_a.json &
+curl -s -X POST "$BASE/api/presale" -H 'Content-Type: application/json' -d "{\"email\":\"$CONC_EMAIL\"}" > /tmp/conc_b.json &
+wait
+CONC_CODES=$(cat /tmp/conc_a.json /tmp/conc_b.json | grep -o '"code":"[a-z]*"' | sort | tr '\n' ',')
+if [ "$CONC_CODES" = '"code":"already","code":"new",' ]; then
+  echo "  ok - two simultaneous submissions for the same email -> exactly one 'new', one 'already'"
+  PASS=$((PASS+1))
+else
+  echo "  FAIL - concurrent duplicate handling: got codes [$CONC_CODES]"
+  FAIL=$((FAIL+1))
+fi
+rm -f /tmp/conc_a.json /tmp/conc_b.json
 
 req POST /api/presale "{\"email\":\"attr-$(date +%s)@example.com\",\"source\":\"instagram\",\"campaign\":\"edition01\",\"medium\":\"organic-social\",\"term\":\"descarded\",\"content\":\"reel03\"}"
 check "attribution fields accepted -> new" 200 '"code":"new"' "$STATUS" "$BODY"
@@ -79,8 +115,33 @@ check "oversized payload field -> 400" 400 "error" "$STATUS" "$BODY"
 req POST /api/presale '{not valid json'
 check "malformed JSON -> 400" 400 "BAD REQUEST BODY" "$STATUS" "$BODY"
 
-req POST /api/presale '{"email":"schema-mismatch@example.com"}'
-check "incorrect spreadsheet schema -> 502, honest failure" 502 "error" "$STATUS" "$BODY"
+echo "== presale: D1 primary, Google background sync =="
+
+OK_EMAIL="sync-ok-$(date +%s)@example.com"
+req POST /api/presale "{\"email\":\"$OK_EMAIL\"}"
+check "valid submission -> new (response returned before Google sync)" 200 '"code":"new"' "$STATUS" "$BODY"
+sleep 1
+SYNCED=$(d1_field presale google_synced email "$OK_EMAIL")
+if [ "$SYNCED" = "1" ]; then
+  echo "  ok - D1 row marked google_synced=1 after background sync completes"
+  PASS=$((PASS+1))
+else
+  echo "  FAIL - expected google_synced=1, got: $SYNCED"
+  FAIL=$((FAIL+1))
+fi
+
+FAIL_EMAIL="schema-mismatch@example.com"
+req POST /api/presale "{\"email\":\"$FAIL_EMAIL\"}"
+check "Google sync failure (bad sheet schema) does NOT fail the user-facing request" 200 '"code":"new"' "$STATUS" "$BODY"
+sleep 1
+SYNCERR=$(d1_field presale google_sync_error email "$FAIL_EMAIL")
+if echo "$SYNCERR" | grep -q "INVALID SHEET SCHEMA"; then
+  echo "  ok - D1 row records google_sync_error, lead is NOT lost (row still exists in D1)"
+  PASS=$((PASS+1))
+else
+  echo "  FAIL - expected google_sync_error to record the schema mismatch, got: $SYNCERR"
+  FAIL=$((FAIL+1))
+fi
 
 echo "== artists =="
 
@@ -126,8 +187,49 @@ check "honeypot populated -> 400, rejected before persistence" 400 "error" "$STA
 req POST /api/artists '{not valid json'
 check "malformed JSON -> 400" 400 "BAD REQUEST BODY" "$STATUS" "$BODY"
 
+echo "== artists: D1 primary, Google background sync + retry safety =="
+
+ARTIST_OK_NAME="Sync OK Test"
+req POST /api/artists "{\"artist_name\":\"$ARTIST_OK_NAME\",\"email\":\"artist-sync-$(date +%s)@example.com\",\"creator_type\":\"OTHER\",\"portfolio_url\":\"x.com\"}"
+check "valid submission -> ref (response returned before Google sync)" 200 '"ref":"DSC-' "$STATUS" "$BODY"
+ARTIST_REF=$(echo "$BODY" | grep -o '"ref":"[^"]*"' | cut -d'"' -f4)
+sleep 1
+ARTIST_SYNCED=$(d1_field artists google_synced ref "$ARTIST_REF")
+if [ "$ARTIST_SYNCED" = "1" ]; then
+  echo "  ok - D1 row marked google_synced=1 after background sync completes"
+  PASS=$((PASS+1))
+else
+  echo "  FAIL - expected google_synced=1 for ref $ARTIST_REF, got: $ARTIST_SYNCED"
+  FAIL=$((FAIL+1))
+fi
+
 req POST /api/artists '{"artist_name":"SCHEMA_MISMATCH","email":"schema2@example.com","creator_type":"OTHER","portfolio_url":"x.com"}'
-check "incorrect spreadsheet schema -> 502, honest failure" 502 "error" "$STATUS" "$BODY"
+check "Google sync failure (bad sheet schema) does NOT fail the user-facing request" 200 '"ref":"DSC-' "$STATUS" "$BODY"
+SCHEMA_REF=$(echo "$BODY" | grep -o '"ref":"[^"]*"' | cut -d'"' -f4)
+sleep 1
+ARTIST_SYNCERR=$(d1_field artists google_sync_error ref "$SCHEMA_REF")
+if echo "$ARTIST_SYNCERR" | grep -q "INVALID SHEET SCHEMA"; then
+  echo "  ok - D1 row records google_sync_error, submission is NOT lost (row still exists in D1)"
+  PASS=$((PASS+1))
+else
+  echo "  FAIL - expected google_sync_error to record the schema mismatch, got: $ARTIST_SYNCERR"
+  FAIL=$((FAIL+1))
+fi
+
+# Retry-safety: directly re-post the SAME ref straight to the mock (as a
+# retried background sync would) and confirm Code.gs-equivalent dedup means
+# no second row is created — see mock-apps-script.mjs's ref check.
+BEFORE_COUNT=$(curl -s http://127.0.0.1:8791/_debug | grep -o '"artistCount":[0-9]*' | cut -d: -f2)
+curl -s -X POST http://127.0.0.1:8791 -H 'Content-Type: application/json' \
+  -d "{\"secret\":\"test-shared-secret\",\"op\":\"artist\",\"data\":{\"ref\":\"$ARTIST_REF\",\"artist_name\":\"$ARTIST_OK_NAME\",\"creator_type\":\"OTHER\",\"email\":\"retry@example.com\",\"portfolio_url\":\"x.com\"}}" > /dev/null
+AFTER_COUNT=$(curl -s http://127.0.0.1:8791/_debug | grep -o '"artistCount":[0-9]*' | cut -d: -f2)
+if [ "$BEFORE_COUNT" = "$AFTER_COUNT" ]; then
+  echo "  ok - retrying a background sync with the same ref does not create a duplicate mirror row"
+  PASS=$((PASS+1))
+else
+  echo "  FAIL - artist mirror row count grew on retry ($BEFORE_COUNT -> $AFTER_COUNT), ref should have deduped"
+  FAIL=$((FAIL+1))
+fi
 
 echo "== health =="
 req GET /api/health ""

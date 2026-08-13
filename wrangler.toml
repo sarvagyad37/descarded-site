@@ -1,0 +1,24 @@
+name = "descarded"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "."
+
+# D1 — source of truth for Presale/Artists form submissions.
+# Google Sheets remains an operational mirror, synced in the background
+# after a D1 write succeeds (see functions/api/_store.js).
+#
+# database_id below is a LOCAL-DEV PLACEHOLDER, not a real database.
+# `wrangler pages dev` / `wrangler d1 migrations apply DB --local` only
+# ever touch the local sqlite file under .wrangler/state — this id is
+# never sent anywhere. Do NOT deploy with this placeholder.
+#
+# Before the first real (remote) deploy:
+#   1. npx wrangler d1 create descarded-db
+#   2. copy the printed "database_id" (a UUID) into database_id below,
+#      replacing REPLACE_WITH_REMOTE_DATABASE_ID
+#   3. npx wrangler d1 migrations apply DB --remote
+# See docs/PRODUCTION_ACTIVATION_CHECKLIST.md for the full sequence.
+[[d1_databases]]
+binding = "DB"
+database_name = "descarded-db"
+database_id = "REPLACE_WITH_REMOTE_DATABASE_ID"
+migrations_dir = "migrations"

@@ -2,7 +2,13 @@
 # wrangler's local-secrets convention (gitignored) — Cloudflare Pages itself
 # does not read a .env file in production; real deployments use
 # `wrangler pages secret put` or the dashboard instead. See README.md →
-# "Google Sheets persistence" for both.
+# "Google Sheets mirror (background sync)" for both. D1 (the primary store)
+# needs no secrets — it's configured via the `DB` binding in wrangler.toml.
 
 GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/REPLACE_ME/exec
 GOOGLE_APPS_SCRIPT_SECRET=replace-with-a-long-random-value
+
+# Optional, local-dev only: adds X-Timing-Validation-Ms / X-Timing-D1-Ms
+# response headers, used by scripts/measure-latency.mjs. Never set in
+# production Cloudflare secrets.
+DEBUG_TIMING=true

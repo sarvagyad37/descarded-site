@@ -8,21 +8,41 @@ client-side.
 Replaces the earlier single-file Artifact export at `../site/deploy/` (kept as-is,
 not part of this build).
 
-See `KNOWN_ISSUES.md` for an open, unfixed issue (Apps Script latency /
-occasional false-failure-despite-success) before touching persistence code.
+See `KNOWN_ISSUES.md` — the Apps Script latency issue logged there is what
+motivated moving to D1 as the source of truth (see "Architecture" below);
+it's now resolved for the visitor-facing path specifically, not for Google
+Sheets latency in general, which still exists in the background sync.
+
+## Architecture
+
+```
+OLD: Browser -> Cloudflare Pages Functions -> Google Apps Script -> Sheets -> response
+
+NEW: Browser -> Cloudflare Pages Functions -> D1 -> response
+                                                |
+                                                +-> (background, context.waitUntil)
+                                                     Google Apps Script -> Sheets
+```
+
+D1 is the source of truth. The visitor-facing response returns as soon as D1
+confirms the write — it never waits on Google. Google Sheets is now an
+**operational mirror**, kept in sync in the background; see "D1 persistence"
+and "Google Sheets mirror" below.
 
 ## Run locally
 
-Any static file server works, e.g.:
+```
+npx wrangler d1 migrations apply DB --local   # first time, or after a new migration
+npx wrangler pages dev .
+```
+
+`wrangler pages dev` reads the D1 binding from `wrangler.toml` automatically
+(no `--d1` flag needed, and passing one will point it at an unmigrated,
+unrelated local database — see "D1 persistence" below). For a plain static
+preview without the API routes:
 
 ```
-npx wrangler pages dev site
-```
-
-or for a plain static preview without the API routes:
-
-```
-npx serve site
+npx serve .
 ```
 
 ## Files
@@ -33,20 +53,25 @@ npx serve site
 | `conduct.html` / `privacy.html` / `contact.html` | Trust pages — honest TODO placeholders where real copy/contact info doesn't exist yet |
 | `styles.css` | Shared styles |
 | `app.js` | Shared behavior — mobile menu, pre-sale modal, artist form |
-| `functions/api/presale.js` | `POST /api/presale` → `{ code: "new" \| "already" }` |
-| `functions/api/artists.js` | `POST /api/artists` → `{ ref }` |
-| `functions/api/health.js` | `GET /api/health` → truthful config status, no fabricated counts |
-| `functions/api/_store.js` | Google Sheets persistence client (server-side only — see "Google Sheets persistence" below) |
+| `functions/api/presale.js` | `POST /api/presale` → `{ code: "new" \| "already" }` — D1-primary write |
+| `functions/api/artists.js` | `POST /api/artists` → `{ ref }` — D1-primary write |
+| `functions/api/health.js` | `GET /api/health` → truthful config status (D1 binding + Google mirror secrets), no fabricated counts |
+| `functions/api/_db.js` | D1 client — source of truth (server-side only — see "D1 persistence" below) |
+| `functions/api/_store.js` | Google Sheets background-sync client (server-side only, called via `context.waitUntil(...)` — see "Google Sheets mirror" below) |
+| `wrangler.toml` | Pages config incl. the `DB` D1 binding |
+| `migrations/0001_init.sql` | D1 schema — `presale` and `artists` tables |
 | `_headers` | Cloudflare Pages cache-control rules |
-| `.assetsignore` | Excludes `functions/`, `integrations/`, `scripts/` etc. from the deployed static asset bundle |
+| `.assetsignore` | Excludes `functions/`, `integrations/`, `scripts/`, `migrations/` etc. from the deployed static asset bundle |
 | `assets/hero-still-life.jpg` | Hero photo, also used as the OG/Twitter share image |
 | `_partials/nav.html` | Single source of truth for the header + mobile menu |
 | `_partials/presale-modal.html` | Single source of truth for the pre-sale modal (all fields, consent, honeypot) |
 | `build.mjs` | Injects both partials into every page between their `START`/`END` markers |
 | `integrations/google-apps-script/Code.gs` | The Google Apps Script Web App source — copy this into the business Google account |
 | `scripts/mock-apps-script.mjs` | Dev/test-only stand-in for the real Apps Script, used by `wrangler pages dev` locally |
-| `scripts/test-store.mjs` | Unit tests for `_store.js`'s Google-side failure handling |
-| `scripts/test-api.sh` | Integration test matrix against a running dev server |
+| `scripts/test-db.mjs` | Unit tests for `_db.js` — D1 write paths, duplicate handling, sync bookkeeping |
+| `scripts/test-store.mjs` | Unit tests for `_store.js`'s Google background-sync failure handling |
+| `scripts/test-api.sh` | Integration test matrix against a running dev server, incl. concurrency + sync-failure cases |
+| `scripts/measure-latency.mjs` | Local timing check — validation / D1 write / API response / background Google sync, measured separately |
 
 ## Editing the header / nav / pre-sale modal
 
@@ -73,13 +98,19 @@ edit it directly if it ever needs to change.
 become Pages Functions automatically at `/api/presale`, `/api/artists`, `/api/health`;
 no route config needed. Same-origin, so no CORS is required (unlike the old Vercel
 build, which needed `Access-Control-Allow-Origin: *` because forms could hit the API
-from a different origin during static-only hosting).
+from a different origin during static-only hosting). The Pages project also needs a
+real D1 database bound as `DB` before this works — see "D1 persistence" →
+"Production activation" below; **this has not been done yet**, see
+`docs/PRODUCTION_ACTIVATION_CHECKLIST.md`.
 
 ## Before launch
 
-1. Complete the Google Sheets setup below — until `GOOGLE_APPS_SCRIPT_URL` and
-   `GOOGLE_APPS_SCRIPT_SECRET` are set in Cloudflare, both forms will honestly fail
-   (502, "couldn't join" / "couldn't send") rather than pretend to succeed.
+1. Complete D1 production activation (`docs/PRODUCTION_ACTIVATION_CHECKLIST.md`) —
+   until a real D1 database is bound as `DB`, both forms will honestly fail (502,
+   "couldn't join" / "couldn't send") rather than pretend to succeed. Google Sheets
+   setup (below) is separate and no longer blocking: without it, submissions still
+   succeed via D1, they just never get mirrored to Sheets (`google_synced` stays
+   `0`, `google_sync_error` records why — see "D1 persistence").
 2. `contact.html` has no monitored email wired up. Do not invent one — add it once a
    real inbox exists, in one place (search for `TODO` in `contact.html`).
 3. `conduct.html` and `privacy.html` are honest placeholders, not fake legal copy.
@@ -88,9 +119,10 @@ from a different origin during static-only hosting).
    is live — they're commented out on purpose rather than pointing at a guessed URL.
 5. Configure Cloudflare-level rate limiting on `/api/*` — see "Abuse controls" below.
    This can't live in the repo; it's dashboard/API configuration on the zone.
-6. Verify `functions/`, `integrations/`, and `scripts/` are actually excluded from the
-   live static bundle after your first deploy (see "A known local-only gap" below) —
-   `.assetsignore` is in place but wasn't confirmed against a real deployment.
+6. Verify `functions/`, `integrations/`, `scripts/`, and `migrations/` are actually
+   excluded from the live static bundle after your first deploy (see "A known
+   local-only gap" below) — `.assetsignore` is in place but wasn't confirmed against
+   a real deployment.
 7. Get real legal/compliance review on the SMS opt-in copy and the email-consent
    mechanism before connecting anything to `sms_consent`/`email_consent` — see
    "Privacy — what still needs human review" below. Neither is fake, both are
@@ -117,25 +149,144 @@ file crawlers and no-JS clients can read.
 - No fake queue/confirmation-email language: pre-sale sign-up is a single step
   (email → "you're in"), not a double opt-in. There is no confirmation-email system,
   so none is implied in the copy.
-- There is no local/demo fallback. If `/api/presale` or `/api/artists` can't reach
-  Google Sheets, or Google rejects the write, the form shows a real error and keeps
-  what the user typed so they can retry — it never claims a submission succeeded
-  unless persistence actually confirmed it.
+- There is no fake-success fallback. If `/api/presale` or `/api/artists` can't
+  write to D1, the form shows a real error and keeps what the user typed so they
+  can retry — it never claims a submission succeeded unless D1 actually confirmed
+  it. A Google Sheets mirror failure, by contrast, never reaches the visitor at
+  all — see "D1 persistence" and "Google Sheets mirror" below.
 - No social links in the footer. There are no official DESCARDED social accounts yet;
   the UI is left out entirely rather than pointing at invented handles.
 
-## Google Sheets persistence
+## D1 persistence
 
-Form submissions are persisted server-side to a Google Sheet, via a Google Apps
-Script Web App that only Cloudflare Pages Functions talk to. The browser never
-sees the Apps Script URL or its shared secret — those exist only as Cloudflare
-Pages environment secrets.
+D1 is the source of truth for both forms. The binding name is **`DB`** —
+used consistently in `wrangler.toml`, every `functions/api/*.js` handler, and
+every script in this section; don't introduce a second name for it.
 
 ```
 DESCARDED HTML → app.js → Cloudflare Pages Functions (/api/presale, /api/artists)
-              → authenticated server-side fetch → Google Apps Script Web App
-              → "DESCARDED — Form Submissions" spreadsheet
+              → D1 (binding DB) → response
+                    |
+                    +→ context.waitUntil(...) → Google Apps Script Web App
+                                               → "DESCARDED — Form Submissions" spreadsheet
 ```
+
+### Schema / migrations
+
+`migrations/0001_init.sql` creates the `presale` and `artists` tables (see
+that file for the full column list, uniqueness constraints, and indexes — it
+mirrors the Google Sheets header names 1:1, plus three sync-bookkeeping
+columns: `google_synced`, `google_synced_at`, `google_sync_error`).
+
+A new schema change is a new migration file (`migrations/0002_whatever.sql`),
+never an edit to `0001_init.sql` — D1 tracks applied migrations by filename
+in a `d1_migrations` table, so editing an already-applied file does nothing
+locally and desyncs local/remote schema.
+
+### Local development
+
+```
+npx wrangler d1 migrations apply DB --local   # first time, or after a new migration
+npx wrangler pages dev .                      # reads the DB binding from wrangler.toml
+```
+
+Both only ever touch a local sqlite file under `.wrangler/state/v3/d1` — no
+network call, no real Cloudflare account needed. Inspect it directly any
+time:
+
+```
+npx wrangler d1 execute DB --local --command "SELECT * FROM presale ORDER BY created_at DESC LIMIT 10;"
+```
+
+`wrangler.toml`'s `database_id` is a **local-dev placeholder**
+(`REPLACE_WITH_REMOTE_DATABASE_ID`), not a real database — see "Production
+activation" below for what replaces it and when.
+
+### Duplicate handling
+
+`email` (presale) and `ref` (artists) are UNIQUE-indexed D1 columns. Two
+simultaneous submissions for the same normalized email race at the D1/SQLite
+layer itself — one `INSERT` wins, the other throws a UNIQUE constraint
+error, which `_db.js`'s `insertPresale()` turns into `{ code: "already" }`.
+No application-level lock is involved (unlike the old `LockService`-based
+approach in `Code.gs`, which is still used for the Google mirror's own
+append, a much lower-stakes operation now that it's not on the response
+path). `referral_code` is intentionally **not** unique-constrained — nothing
+in the app ever guaranteed its uniqueness (see "Referral code" below), so
+adding a constraint now would turn a pre-existing, extremely unlikely
+collision into a new hard failure mode instead of preserving current
+behavior.
+
+### Failure behavior
+
+If D1 is unavailable or a write fails for any reason other than the email/ref
+uniqueness constraint, the Cloudflare function returns `502` with a short
+honest error string and writes nothing — same contract as the old
+Google-failure 502, just triggered by D1 now instead. The frontend shows
+that error inline and keeps whatever the user typed.
+
+Once D1 confirms the write, the response is sent immediately — the request
+never waits on Google. See "Google Sheets mirror" below for what happens
+after that.
+
+### Finding unsynced records
+
+```
+npx wrangler d1 execute DB --local --command "SELECT lead_id, email, google_sync_error FROM presale WHERE google_synced = 0;"
+npx wrangler d1 execute DB --local --command "SELECT ref, email, google_sync_error FROM artists WHERE google_synced = 0;"
+```
+
+(Add `--remote` once running against production — see "Production
+activation".) `google_synced = 0` covers both "never attempted" (shouldn't
+happen — sync is always scheduled right after a successful D1 write, unless
+the whole Worker instance was killed before `waitUntil` ran) and "attempted
+and failed" (`google_sync_error` will be non-empty in that case).
+
+### Manually retrying a failed Google sync
+
+There's no automatic retry in this sprint (see "Retry safety" — Cloudflare
+Queues would give real retry guarantees and can be introduced later if
+needed, but isn't required to make the current failure mode safe). To retry
+by hand, re-run the same sync function locally against the live row's data —
+it's safe to retry: `Code.gs` dedupes presale by email and artists by `ref`
+(see "Google Sheets mirror" below), so a retried sync can't create a
+duplicate Sheet row even if run twice.
+
+There's no packaged CLI for this yet; the direct route is a one-off Node
+REPL/script that imports `syncPresaleToGoogle`/`syncArtistToGoogle` from
+`functions/api/_store.js`, constructs `env` from the real
+`GOOGLE_APPS_SCRIPT_URL`/`GOOGLE_APPS_SCRIPT_SECRET` values plus a D1
+binding (via `wrangler d1 execute` for the read, or the D1 HTTP API for a
+scripted read+write), and calls the sync function with the unsynced row's
+data. Worth formalizing into a real `scripts/retry-google-sync.mjs` if
+manual retries turn out to be routine rather than rare.
+
+### Rollback considerations
+
+D1 is additive — nothing in this migration deletes or modifies the existing
+Google Apps Script / Sheets setup, which still works standalone (`Code.gs`
+hasn't changed its core write behavior, only gained ref-based dedup for
+artists). If D1 needs to be rolled back after a production deploy:
+
+- The forms will need to go back to calling Apps Script directly and waiting
+  on it (i.e. revert `presale.js`/`artists.js`/`_store.js` to their
+  pre-migration versions — check them out from the commit before this one).
+- Any rows written to D1 in the meantime are not automatically backfilled
+  into Sheets — they'd need a one-off export/import if that data must be
+  preserved in the spreadsheet.
+- No data is lost by rolling back the *code* alone — D1 rows stay in D1
+  either way, they'd just stop being written to going forward.
+
+## Google Sheets mirror (background sync)
+
+Google Sheets is now an **operational mirror**, not the source of truth. A
+successful D1 write triggers a background sync — `context.waitUntil(...)`
+calling into a Google Apps Script Web App that only Cloudflare Pages
+Functions talk to. The browser never sees the Apps Script URL or its shared
+secret — those exist only as Cloudflare Pages environment secrets. The
+visitor's request has already been answered by the time this runs; a
+failure here is recorded onto the D1 row (`google_sync_error`) and logged,
+never surfaced to the visitor.
 
 ### 1–3. Spreadsheet, worksheets, columns
 
@@ -327,23 +478,29 @@ sh scripts/test-api.sh        # integration tests: full request/validation matri
 
 ### 10. Expected duplicate behavior
 
-Presale duplicate detection is by normalized email (trimmed, lowercased),
-checked against the **Presale** sheet's email column under a script lock, so
-two concurrent submissions of the same email can't both pass the check and
-create two rows. A duplicate does not update or move the existing row — the
-original `created_at`/attribution is left alone, and the response is simply
-`{ "code": "already" }`. Artist submissions are never deduplicated or cross-
-written into the Presale sheet — submitting the artist form does not add
-someone to the pre-sale list.
+The authoritative duplicate check now happens in D1 (see "D1 persistence" →
+"Duplicate handling") — the response `{ "code": "already" }` is decided
+there, before Google is ever contacted. `Code.gs`'s own email-column lock/
+scan (described above) still exists and still protects the Sheet from a
+duplicate row if the background sync somehow runs twice for the same lead
+(e.g. a manual retry), but it is no longer what the visitor's response
+depends on. Same reasoning applies to artists: `ref` is now the dedup key on
+both sides (D1 uniquely, `Code.gs` by lookup — see the ref-dedup added to
+`handleArtist`), so a retried sync can't create a second Sheet row.
 
 ### 11. Expected failure behavior
 
-If Google is unreachable, rejects the request (bad/missing secret), or
-returns something that isn't valid JSON, the Cloudflare function returns
-`502` with a short honest error string and writes nothing. The frontend shows
-that error inline and keeps whatever the user typed. There is no scenario in
-which the UI says "you're in" or shows a `DSC-XXXXX` ref without a prior
-`ok: true` from Apps Script.
+**D1 write failure** (the request path): `502`, short honest error string,
+nothing written anywhere. Frontend shows the error inline, keeps what the
+user typed. No scenario shows "you're in" or a `DSC-XXXXX` ref without a
+prior confirmed D1 write.
+
+**Google sync failure** (the background path, after D1 already succeeded —
+unreachable, rejects the request, returns non-JSON, or a schema mismatch):
+recorded onto the D1 row as `google_sync_error` and logged server-side.
+**Never surfaced to the visitor** — their submission already succeeded the
+moment D1 confirmed it, and that fact doesn't change based on what Google
+does afterward.
 
 ### Attribution
 

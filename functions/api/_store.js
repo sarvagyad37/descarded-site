@@ -1,17 +1,20 @@
-/* Google Sheets persistence client.
-   Calls a Google Apps Script Web App over a server-side, authenticated
-   fetch. The Apps Script URL and shared secret live only in Cloudflare
-   Pages environment secrets (GOOGLE_APPS_SCRIPT_URL,
-   GOOGLE_APPS_SCRIPT_SECRET) — never in client-side code, never committed.
+/* Google Sheets background sync.
+   D1 (see _db.js) is the source of truth and the only thing the request
+   fast path waits on. This module is called from context.waitUntil(...)
+   AFTER a D1 write already succeeded — its entire job is to mirror that row
+   into Google Sheets via the existing Apps Script Web App, and record the
+   outcome back onto the D1 row (google_synced / google_synced_at /
+   google_sync_error). A failure here is logged and recorded; it must never
+   surface to the visitor, because their submission already succeeded.
 
-   Apps Script always responds 200 with a JSON body describing success/
-   failure (it has no way to set arbitrary HTTP status codes), so success
-   is read from payload.ok, not from the HTTP status.
+   The Apps Script URL and shared secret live only in Cloudflare Pages
+   environment secrets (GOOGLE_APPS_SCRIPT_URL, GOOGLE_APPS_SCRIPT_SECRET) —
+   never in client-side code, never committed. Apps Script always responds
+   200 with a JSON body describing success/failure (it has no way to set
+   arbitrary HTTP status codes), so success is read from payload.ok, not
+   from the HTTP status. */
 
-   This module owns generating the server-side fields the visitor never
-   enters directly: lead_id, referral_code, status, and (for artists) ref.
-   created_at is generated in Code.gs instead, at the moment of actual
-   persistence — see that file for why. */
+import { markGoogleSynced, markGoogleSyncError } from './_db.js';
 
 export class StoreError extends Error {
   constructor(code, message) {
@@ -70,52 +73,66 @@ async function callAppsScript(env, op, data) {
   return payload;
 }
 
-/* entry keys match the Presale sheet's header names 1:1, so Code.gs can
-   write by header lookup without any name translation. created_at is
-   intentionally NOT included — Code.gs always stamps that itself. */
-export async function addSubscriber(env, entry) {
-  const email = String(entry.email || '').trim().toLowerCase();
-  const payload = await callAppsScript(env, 'presale', {
-    lead_id: generateLeadId(),
-    phone: entry.phone || '',
-    referral_code: generateReferralCode(),
-    email_consent: true,
-    sms_consent: Boolean(entry.smsConsent),
-    referred_by: entry.referredBy || '',
-    first_name: entry.firstName || '',
-    last_name: entry.lastName || '',
-    email,
-    status: 'active',
-    source: entry.source || '',
-    campaign: entry.campaign || '',
-    medium: entry.medium || '',
-    term: entry.term || '',
-    content: entry.content || '',
-    ip_address: entry.ipAddress || '',
-    user_agent: entry.userAgent || '',
-    notes: ''
-  });
-  return { code: payload.code === 'already' ? 'already' : 'new' };
+/* Mirrors an already-persisted presale row into Google Sheets. Call only
+   from context.waitUntil(...) after insertPresale() returned { code: "new" }
+   — a duplicate ("already") never reaches here, since no new row exists to
+   mirror. `row` keys match the Presale sheet's header names 1:1, so Code.gs
+   can write by header lookup without any name translation. created_at is
+   intentionally NOT sent — Code.gs always stamps that itself, independently,
+   at the moment it actually appends (see Code.gs for why: it must reflect
+   Sheets write time, not D1 write time). */
+export async function syncPresaleToGoogle(env, row) {
+  try {
+    await callAppsScript(env, 'presale', {
+      lead_id: row.lead_id,
+      phone: row.phone || '',
+      referral_code: row.referral_code,
+      email_consent: true,
+      sms_consent: Boolean(row.sms_consent),
+      referred_by: row.referred_by || '',
+      first_name: row.first_name || '',
+      last_name: row.last_name || '',
+      email: row.email,
+      status: row.status || 'active',
+      source: row.source || '',
+      campaign: row.campaign || '',
+      medium: row.medium || '',
+      term: row.term || '',
+      content: row.content || '',
+      ip_address: row.ip_address || '',
+      user_agent: row.user_agent || '',
+      notes: row.notes || ''
+    });
+    await markGoogleSynced(env, 'presale', 'lead_id', row.lead_id);
+  } catch (e) {
+    console.error('syncPresaleToGoogle failed for lead_id=' + row.lead_id + ':', e && e.message);
+    await markGoogleSyncError(env, 'presale', 'lead_id', row.lead_id, (e && e.message) || 'unknown error');
+  }
 }
 
-/* entry keys match the Artists sheet's header names 1:1, same reasoning.
-   creator_type is the controlled-vocabulary triage field (DJ / MUSIC,
-   PERFORMANCE, etc — see functions/api/artists.js for the list); genre is
-   a separate, optional, free-text style field and is never used as a
-   substitute for it. */
-export async function addSubmission(env, entry) {
-  const ref = generateArtistRef();
-  await callAppsScript(env, 'artist', {
-    ref,
-    artist_name: entry.artistName || '',
-    creator_type: entry.creatorType || '',
-    genre: entry.genre || '',
-    email: String(entry.email || '').trim().toLowerCase(),
-    phone: entry.phone || '',
-    portfolio_url: entry.portfolioUrl || '',
-    social_media_url: entry.socialMediaUrl || '',
-    status: 'new',
-    notes: ''
-  });
-  return { ref };
+/* Mirrors an already-persisted artist row into Google Sheets. Call only
+   from context.waitUntil(...) after insertArtist() returned a ref. `row`
+   keys match the Artists sheet's header names 1:1. `ref` is the stable
+   identifier Code.gs now dedupes on (see Code.gs's handleArtist), so a
+   retried background sync for the same D1 row can never create a second
+   sheet row. */
+export async function syncArtistToGoogle(env, row) {
+  try {
+    await callAppsScript(env, 'artist', {
+      ref: row.ref,
+      artist_name: row.artist_name || '',
+      creator_type: row.creator_type || '',
+      genre: row.genre || '',
+      email: row.email,
+      phone: row.phone || '',
+      portfolio_url: row.portfolio_url || '',
+      social_media_url: row.social_media_url || '',
+      status: row.status || 'new',
+      notes: row.notes || ''
+    });
+    await markGoogleSynced(env, 'artists', 'ref', row.ref);
+  } catch (e) {
+    console.error('syncArtistToGoogle failed for ref=' + row.ref + ':', e && e.message);
+    await markGoogleSyncError(env, 'artists', 'ref', row.ref, (e && e.message) || 'unknown error');
+  }
 }

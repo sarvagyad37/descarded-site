@@ -136,6 +136,15 @@ function handleArtist(data) {
     var sheetInfo = getValidatedSheet(ARTISTS_SHEET, ARTISTS_HEADERS);
     if (!sheetInfo.ok) return sheetInfo;
 
+    // ref is the stable identifier for a given D1 row's mirror write — a
+    // retried background sync (D1 write succeeded, an earlier sync attempt
+    // failed or timed out) must not create a second row for the same ref.
+    var refCol = sheetInfo.headerMap.ref;
+    var existingRow = findRowByColumnValue(sheetInfo.sheet, refCol, ref.toLowerCase());
+    if (existingRow) {
+      return { ok: true, ref: ref };
+    }
+
     var row = mapRowFromHeaders(sheetInfo.headers, Object.assign({}, data, { email: email, ref: ref }));
     sheetInfo.sheet.appendRow(row);
     return { ok: true, ref: ref };
