@@ -80,8 +80,6 @@ control client-side.
 | `field_completed` | a field is blurred with a non-empty value, the first time | `form`, `field` (the input's `name` attribute — never its value) |
 | `form_abandoned` | `form_started` fired but the form was closed/navigated away from before `form_submitted` fired | `form` |
 | `form_submitted` | the confirmed-success DOM state — watched via `MutationObserver` on the result view's `hidden` attribute, which `app.js` only ever unhides after the API call resolves successfully (D1 is the authority — see `functions/api/presale.js` / `artists.js`) | `form` |
-| `portfolio_link_added` | the artist form's Work Link field is completed for the first time | `form: "artist"` |
-| `social_link_added` | the artist form's Social Media field is completed for the first time | `form: "artist"` |
 
 **Why `form_started` uses `input`/`change`, not `focus`**: `openPresale()`
 in `app.js` calls `emailInput.focus()` programmatically when the pre-sale
@@ -116,7 +114,7 @@ never claim more than the interface itself confirms.
 | Event | Owner (who acts on this) |
 |---|---|
 | `home_viewed`, global acquisition properties | Growth/marketing — channel effectiveness |
-| `artist_section_viewed`, `creator_type_selected`, `portfolio_link_added`, `social_link_added` | Artist program / curation — who's interested in submitting and what kind of creator they are |
+| `artist_section_viewed`, `creator_type_selected` | Artist program / curation — who's interested in submitting and what kind of creator they are |
 | `presale_section_viewed` | Growth — pre-sale funnel top |
 | `form_started`, `field_completed`, `form_abandoned`, `form_submitted` | Product — form UX, friction points, drop-off by field |
 
@@ -148,9 +146,9 @@ against the last `field_completed` seen in the same session (via
    `utm_source` / `utm_medium` / `utm_campaign` / `referrer` / `device_type`.
 2. **Artist Interest** — `artist_section_viewed` → `form_started(artist)`
    conversion rate; `creator_type_selected` breakdown by `value` (which
-   creator types are most represented); `portfolio_link_added` /
-   `social_link_added` completion rates as a proxy for applicant
-   seriousness.
+   creator types are most represented); `field_completed` filtered to
+   `field:"portfolio_url"` / `field:"social_media_url"` as a proxy for
+   applicant seriousness.
 3. **Pre-sale Interest** — `presale_section_viewed` → `form_started(presale)`
    → `form_submitted(presale)` conversion rate, by `device_type`.
 4. **Form Friction** — `field_completed` funnel per form (which fields get
@@ -158,6 +156,40 @@ against the last `field_completed` seen in the same session (via
    `form` and `device_type`.
 5. **Conversion Funnel** — the two funnels above side by side, to compare
    artist-path vs. pre-sale-path conversion rates directly.
+
+## Audit: every event vs. a real UI interaction and a business decision
+
+Second-pass audit, applied to the taxonomy after the fixes in the section
+below. Every event was checked against two questions: does it map to a
+real, identifiable UI element/interaction (not a synthetic or
+programmatic side effect), and does it inform a specific business
+decision distinct from every other event in the taxonomy?
+
+| Event | Triggering UI element | Behavioral statement | Business decision informed |
+|---|---|---|---|
+| `home_viewed` | Page load of `/` — no discrete widget; the document itself is the unit of navigation | A visitor arrived at the homepage from a given channel | Which acquisition channels justify continued spend or promotion |
+| `artist_section_viewed` | `.artists-form-wrap` (artists.html) — 40% visible via `IntersectionObserver` | A visitor scrolled far enough to see the artist submission form | Whether artist-program drop-off happens before the form is seen (page/copy problem) or after (form problem) |
+| `presale_section_viewed` | `[data-presale-panel]` — `hidden` attribute becomes `false`, via `MutationObserver` | A visitor's pre-sale modal actually opened | Whether the pre-sale CTA converts attention into intent |
+| `creator_type_selected` | `#a-creator-type` — `change` to a non-empty value | A visitor indicated what kind of creator they are | Which creator types to prioritize in curation/outreach — the direct answer to "who wants to create" |
+| `form_started` | Any field in either form — first `input`/`change` | A visitor began actually filling out a form | Whether the funnel problem is attracting people to the form, or engaging them once there |
+| `field_completed` | Any field in either form — `blur` with a non-empty value, first time per field | A visitor finished a specific field | Which exact field is the friction point, so that field can be simplified, reordered, or made optional |
+| `form_abandoned` | Composite: a field (via `form_started`) + a close control or tab/page close, with no `form_submitted` | A visitor started a form and left without completing it | Primary drop-off metric — whether/where to invest in reducing friction |
+| `form_submitted` | Result view (`[data-presale-result-view]` / `[data-artist-result-view]`) — becomes visible only after confirmed API success | A visitor's submission was actually persisted | The outcome metric — actual conversion, the direct answer to the research question |
+
+**Removed — failed the audit:**
+
+| Event | Why removed |
+|---|---|
+| `portfolio_link_added` | Fired under the exact same condition as `field_completed{field:"portfolio_url"}` (same `blur` handler, same guard, no independent value or timing) — informed nothing `field_completed` didn't already cover |
+| `social_link_added` | Same redundancy, against `field_completed{field:"social_media_url"}` |
+
+Neither removed event failed the "real UI element" check — `#a-portfolio`
+and `#a-social` are real fields. They failed the second check: no
+decision depends on them that `field_completed` filtered by `field`
+doesn't already answer just as well, with one fewer event type to
+maintain. Removed from `analytics.js` (the `linkFields` mechanism in
+`instrumentForm` was deleted entirely, not just its two call sites) and
+from every table in this document. Not yet committed.
 
 ## Audit findings (fixed before commit)
 

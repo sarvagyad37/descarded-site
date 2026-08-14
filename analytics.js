@@ -15,6 +15,14 @@
    field matters for research (creator_type), only the field NAME or a
    fixed category value is sent, never a free-text value the visitor typed.
 
+   Every event below was audited against two questions: does it map to a
+   real, identifiable UI element/interaction, and does it inform a
+   specific business decision? portfolio_link_added / social_link_added
+   were removed after that audit — they fired under the exact same
+   condition as field_completed(field="portfolio_url"/"social_media_url")
+   and informed nothing field_completed didn't already cover. See
+   docs/posthog.md's audit section for the full table.
+
    Full taxonomy + rationale: docs/posthog.md. If PostHog is unconfigured
    (no POSTHOG_API_KEY) or the script/network fails, every call below is a
    silent no-op — this file must never be able to break the site. */
@@ -222,10 +230,6 @@
         if (hasValue && !completedFields[el.name]) {
           completedFields[el.name] = true;
           track('field_completed', { form: formName, field: el.name });
-
-          if (opts.linkFields && opts.linkFields[el.name]) {
-            track(opts.linkFields[el.name], { form: formName });
-          }
         }
       });
 
@@ -274,9 +278,5 @@
   instrumentForm(artistForm, 'artist', {
     resultView: document.querySelector('[data-artist-result-view]'),
     selectEvents: { creator_type: 'creator_type_selected' },
-    linkFields: {
-      portfolio_url: 'portfolio_link_added',
-      social_media_url: 'social_link_added',
-    },
   });
 })();
