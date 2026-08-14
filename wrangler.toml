@@ -6,19 +6,17 @@ pages_build_output_dir = "."
 # Google Sheets remains an operational mirror, synced in the background
 # after a D1 write succeeds (see functions/api/_store.js).
 #
-# database_id below is a LOCAL-DEV PLACEHOLDER, not a real database.
-# `wrangler pages dev` / `wrangler d1 migrations apply DB --local` only
-# ever touch the local sqlite file under .wrangler/state — this id is
-# never sent anywhere. Do NOT deploy with this placeholder.
+# database_id below points at the real production database
+# (descarded-prod). `wrangler pages dev` / `wrangler d1 migrations apply
+# DB --local` still only ever touch the local sqlite file under
+# .wrangler/state and never send anything to this id.
 #
-# Before the first real (remote) deploy:
-#   1. npx wrangler d1 create descarded-db
-#   2. copy the printed "database_id" (a UUID) into database_id below,
-#      replacing REPLACE_WITH_REMOTE_DATABASE_ID
-#   3. npx wrangler d1 migrations apply DB --remote
-# See docs/PRODUCTION_ACTIVATION_CHECKLIST.md for the full sequence.
+# Migrations have been applied remotely (0001_init.sql). The Pages
+# project still needs the `DB` binding added in the dashboard (Settings
+# → Functions → D1 database bindings) before a deploy can use it — see
+# docs/PRODUCTION_ACTIVATION_CHECKLIST.md for the remaining steps.
 [[d1_databases]]
 binding = "DB"
-database_name = "descarded-db"
-database_id = "REPLACE_WITH_REMOTE_DATABASE_ID"
+database_name = "descarded-prod"
+database_id = "fcc3ba3a-86d1-4fff-9fb4-aaba30d2c0b8"
 migrations_dir = "migrations"

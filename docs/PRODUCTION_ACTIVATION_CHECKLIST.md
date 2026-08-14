@@ -1,12 +1,13 @@
 # Production D1 activation checklist
 
-**Status: LOCAL D1 MIGRATION COMPLETE — PRODUCTION D1 ACTIVATION PENDING.**
+**Status: PRODUCTION D1 ACTIVATION IN PROGRESS (steps 1–5 done, 2026-08-14).**
 
-Everything below requires the Cloudflare dashboard/API to be reachable and a
-`wrangler` session authenticated against the real account. None of it has
-been run yet — this migration was done entirely against a local D1 database
-(`.wrangler/state/v3/d1`) while the dashboard was unavailable. Do not mark
-any step done until it has actually been run and its output checked.
+Steps 1–5 (auth, confirm `descarded-prod` exists, obtain UUID, wire the
+binding into `wrangler.toml`, apply migrations `--remote`) have been run —
+`presale` and `artists` tables exist on the real `descarded-prod` database
+(`fcc3ba3a-86d1-4fff-9fb4-aaba30d2c0b8`). Steps 6 onward (Pages dashboard
+binding, secrets check, deploy, live smoke tests) are still pending. Do not
+mark a step done until it has actually been run and its output checked.
 
 Run all commands from this directory (`descarded/site`) unless noted.
 
@@ -18,20 +19,18 @@ npx wrangler login
 
 Skip if already authenticated (`npx wrangler whoami` to check).
 
-## 2. Create the production D1 database
+## 2. Confirm the production D1 database
 
-```
-npx wrangler d1 create descarded-db
-```
+The production database already exists as `descarded-prod`. Do not run
+`wrangler d1 create` — that would create a second, empty database.
 
 ## 3. Obtain the database UUID
-
-The command above prints a `database_id` (a UUID) — copy it. You can also
-retrieve it later with:
 
 ```
 npx wrangler d1 list
 ```
+
+Find `descarded-prod` in the output and copy its `database_id` (a UUID).
 
 ## 4. Update the Wrangler D1 binding
 
@@ -40,7 +39,7 @@ Edit `wrangler.toml` in this directory — replace the placeholder:
 ```toml
 [[d1_databases]]
 binding = "DB"
-database_name = "descarded-db"
+database_name = "descarded-prod"
 database_id = "REPLACE_WITH_REMOTE_DATABASE_ID"   # <- paste the real UUID here
 migrations_dir = "migrations"
 ```
@@ -60,7 +59,7 @@ one more time before running this if it's been a while since it was written.
 ## 6. Confirm the Pages Function has binding `DB`
 
 In the Cloudflare dashboard: Pages project → Settings → Functions → D1
-database bindings → add `DB` → the `descarded-db` database from step 2, for
+database bindings → add `DB` → the `descarded-prod` database, for
 both **Production** and **Preview** environments (or bind a separate preview
 database if you want preview traffic isolated from production data — this
 migration does not require that, but it's a reasonable option).
