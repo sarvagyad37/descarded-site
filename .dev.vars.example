@@ -12,3 +12,11 @@ GOOGLE_APPS_SCRIPT_SECRET=replace-with-a-long-random-value
 # response headers, used by scripts/measure-latency.mjs. Never set in
 # production Cloudflare secrets.
 DEBUG_TIMING=true
+
+# PostHog — anonymous behavioral research only (see docs/posthog.md).
+# Not a secret: PostHog project API keys are meant to be client-embeddable.
+# Served to the browser via GET /api/config (functions/api/config.js)
+# rather than hardcoded, so it can differ per environment. Leave unset to
+# run with analytics disabled (analytics.js becomes a no-op).
+POSTHOG_API_KEY=phc_replace_with_the_real_project_key
+POSTHOG_HOST=https://us.i.posthog.com
